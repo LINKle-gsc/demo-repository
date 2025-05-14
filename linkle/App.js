@@ -32,30 +32,12 @@ export default function App() {
   const [selectedContacts, setSelectedContacts] = useState({});
   const [permissionStatus, setPermissionStatus] = useState(null);
   const [targetContacts, setTargetContacts] = useState([]);
-  const [currentView, setCurrentView] = useState(VIEW_TYPES.SAVED_TARGETS); // 현재 화면 상태
 
   useEffect(() => {
     console.log("App useEffect triggered - Initial load");
-    loadSavedTargetContacts(); // 앱 시작 시 저장된 타겟 로드
-    requestInitialPermission(); // 앱 시작 시 권한 상태 확인 및 요청 (UI 블록 방지)
+    loadSavedTargetContacts();
+    requestInitialPermission();
   }, []);
-
-  useEffect(() => {
-    // DeviceContactsScreen으로 전환될 때, 그리고 targetContacts나 contacts가 변경될 때 selectedContacts 업데이트
-    if (currentView === VIEW_TYPES.DEVICE_CONTACTS && contacts.length > 0) {
-      console.log("Updating selectedContacts for DeviceContactsScreen");
-      const newSelected = {};
-      targetContacts.forEach(target => {
-        if (contacts.find(c => c.id === target.id)) {
-            newSelected[target.id] = true;
-        }
-      });
-      setSelectedContacts(newSelected);
-    } else if (currentView !== VIEW_TYPES.DEVICE_CONTACTS) {
-        // 다른 뷰로 전환 시 selectedContacts 초기화 (선택 사항)
-        // setSelectedContacts({});
-    }
-  }, [targetContacts, currentView, contacts]); 
 
   const requestInitialPermission = async () => {
     console.log("Requesting initial contacts permission...");
@@ -82,8 +64,8 @@ export default function App() {
 
   const loadDeviceContacts = async () => {
     if (permissionStatus !== 'granted') {
-      Alert.alert("Permission Required", "Contacts permission is needed. Please check settings or grant via button.");
-      return false;
+      Alert.alert("Permission Required", "Contacts permission is needed.");
+      return null;
     }
     console.log("loadDeviceContacts function called");
     try {
@@ -93,15 +75,16 @@ export default function App() {
       console.log("Device contacts loaded. Count:", data ? data.length : 0);
       if (data && data.length > 0) {
         setContacts(data);
+        return data;
       } else {
         setContacts([]);
         console.log("No contacts found on device.");
+        return [];
       }
-      return true;
     } catch (error) {
       console.error("Error loading device contacts:", error);
       Alert.alert("Error", "Failed to load device contacts. " + error.message);
-      return false;
+      return null;
     }
   };
 
@@ -120,7 +103,6 @@ export default function App() {
       setTargetContacts(newTargetContacts);
       console.log('Target contacts updated in AsyncStorage:', newTargetContacts.length);
       Alert.alert("Targets Updated", `Successfully updated ${newTargetContacts.length} call targets!`);
-      setCurrentView(VIEW_TYPES.SAVED_TARGETS);
     } catch (e) {
       console.error("Failed to save target contacts to AsyncStorage", e);
       Alert.alert("Error", "Failed to update target contacts.");
@@ -140,21 +122,32 @@ export default function App() {
     }
   };
 
-  const switchToDeviceContactsView = async () => {
-    if (permissionStatus !== 'granted') {
-      console.log("Requesting permission before switching to device contacts view...");
+  const handlePlusButtonPress = async (navigation) => {
+    let currentPermissionStatus = permissionStatus;
+    if (currentPermissionStatus !== 'granted') {
+      console.log("Requesting permission before navigating to device contacts view...");
       const { status } = await Contacts.requestPermissionsAsync();
       setPermissionStatus(status);
-      if (status !== 'granted') {
-        Alert.alert("Permission Denied", "Contacts permission is required to manage targets from device list.");
-        return;
-      }
+      currentPermissionStatus = status;
     }
-    const loaded = await loadDeviceContacts();
-    if (loaded) {
-        setCurrentView(VIEW_TYPES.DEVICE_CONTACTS);
-    } else {
-        Alert.alert("Load Failed", "Could not load device contacts. Please try again.");
+
+    if (currentPermissionStatus !== 'granted') {
+      Alert.alert("Permission Denied", "Contacts permission is required to manage targets from the device list.");
+      return;
+    }
+
+    const loadedDeviceContacts = await loadDeviceContacts();
+
+    if (loadedDeviceContacts !== null) {
+      const newSelected = {};
+      targetContacts.forEach(target => {
+        if (Array.isArray(loadedDeviceContacts) && loadedDeviceContacts.find(c => c.id === target.id)) {
+          newSelected[target.id] = true;
+        }
+      });
+      setSelectedContacts(newSelected);
+
+      navigation.navigate('DeviceContacts');
     }
   };
 
@@ -176,42 +169,37 @@ export default function App() {
           component={ResultScreen}
           options={{ title: '추천 결과' }}
         />
-        <Stack.Screen name="SavedTargets">
+        <Stack.Screen 
+          name="SavedTargets"
+          options={{ headerShown: false }}
+        >
           {({ navigation }) => (
-            <View style={styles.container}>
-              <SavedTargetsScreen 
-                targetContacts={targetContacts}
-                onManageTargets={switchToDeviceContactsView}
-                onRemoveTarget={removeTargetContact}
-                navigation={navigation}
-              />
-            </View>
+            <SavedTargetsScreen 
+              targetContacts={targetContacts}
+              onManageTargets={() => handlePlusButtonPress(navigation)}
+              onRemoveTarget={removeTargetContact}
+              navigation={navigation}
+            />
           )}
         </Stack.Screen>
-        <Stack.Screen name="DeviceContacts">
+        <Stack.Screen 
+          name="DeviceContacts"
+          options={{ headerShown: false }}
+        >
           {({ navigation }) => (
-            <View style={styles.container}>
-              <DeviceContactsScreen
-                contacts={contacts}
-                selectedContacts={selectedContacts}
-                onToggleContact={toggleContactSelectionInDeviceScreen}
-                onSaveChanges={() => {
-                  saveTargetsFromDeviceScreen();
-                  navigation.navigate('SavedTargets');
-                }}
-                onGoBack={() => navigation.navigate('SavedTargets')}
-              />
-            </View>
+            <DeviceContactsScreen
+              contacts={contacts} 
+              selectedContacts={selectedContacts}
+              onToggleContact={toggleContactSelectionInDeviceScreen}
+              onSaveChanges={() => {
+                saveTargetsFromDeviceScreen();
+                navigation.navigate('SavedTargets');
+              }}
+              onGoBack={() => navigation.navigate('SavedTargets')}
+            />
           )}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>
   );
 }
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: Platform.OS === 'android' ? 25 : 50, // Android StatusBar 고려
-    backgroundColor: '#f0f0f0', // 전체 앱 배경색
-  },
-});
