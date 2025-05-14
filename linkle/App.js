@@ -1,13 +1,27 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Text, View, Platform, Alert } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { enableScreens } from 'react-native-screens';
 import * as Contacts from 'expo-contacts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+// 화면 구성용 컴포넌트
+import QuestionScreen from './screens/QuestionScreen';
+import HomeScreen from './screens/HomeScreen';
+import ResultScreen from './screens/ResultScreen';
 import SavedTargetsScreen from './screens/SavedTargetsScreen';
 import DeviceContactsScreen from './screens/DeviceContactsScreen';
 
-const SAVED_TARGET_CONTACTS_KEY = '@randomCallTargetContacts';
+// 네이티브 스크린 최적화
+enableScreens();
 
-// 화면 타입을 위한 상수
+// 네비게이션 스택 생성
+const Stack = createNativeStackNavigator();
+
+// 연락처 관련 상수
+const SAVED_TARGET_CONTACTS_KEY = '@randomCallTargetContacts';
 const VIEW_TYPES = {
   SAVED_TARGETS: 'SAVED_TARGETS',
   DEVICE_CONTACTS: 'DEVICE_CONTACTS',
@@ -145,41 +159,55 @@ export default function App() {
   };
 
   return (
-    <View style={styles.container}>
-      {currentView === VIEW_TYPES.SAVED_TARGETS && (
-        <SavedTargetsScreen 
-          targetContacts={targetContacts}
-          onManageTargets={switchToDeviceContactsView}
-          onRemoveTarget={removeTargetContact}
+    <NavigationContainer>
+      <Stack.Navigator>
+        <Stack.Screen 
+          name="Home" 
+          component={HomeScreen} 
+          options={{ title: '홈' }}
         />
-      )}
-      {currentView === VIEW_TYPES.DEVICE_CONTACTS && (
-        <DeviceContactsScreen
-          contacts={contacts}
-          selectedContacts={selectedContacts}
-          onToggleContact={toggleContactSelectionInDeviceScreen}
-          onSaveChanges={saveTargetsFromDeviceScreen}
-          onGoBack={() => setCurrentView(VIEW_TYPES.SAVED_TARGETS)}
+        <Stack.Screen 
+          name="Questions" 
+          component={QuestionScreen} 
+          options={{ title: '질문하기' }}
         />
-      )}
-      {/* Optional: Loading or permission status indicator if needed */}
-      {/* {permissionStatus === null && <Text style={styles.permissionText}>Checking permissions...</Text>} */}
-    </View>
+        <Stack.Screen
+          name="Result"
+          component={ResultScreen}
+          options={{ title: '추천 결과' }}
+        />
+        <Stack.Screen name="SavedTargets">
+          {() => (
+            <View style={styles.container}>
+              <SavedTargetsScreen 
+                targetContacts={targetContacts}
+                onManageTargets={switchToDeviceContactsView}
+                onRemoveTarget={removeTargetContact}
+              />
+            </View>
+          )}
+        </Stack.Screen>
+        <Stack.Screen name="DeviceContacts">
+          {() => (
+            <View style={styles.container}>
+              <DeviceContactsScreen
+                contacts={contacts}
+                selectedContacts={selectedContacts}
+                onToggleContact={toggleContactSelectionInDeviceScreen}
+                onSaveChanges={saveTargetsFromDeviceScreen}
+                onGoBack={() => navigation.navigate('SavedTargets')} // or use props
+              />
+            </View>
+          )}
+        </Stack.Screen>
+      </Stack.Navigator>
+    </NavigationContainer>
   );
 }
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: Platform.OS === 'android' ? 25 : 50, // Android StatusBar 고려
     backgroundColor: '#f0f0f0', // 전체 앱 배경색
   },
-  // 예시: permissionText 스타일이 필요하다면 여기에 남겨둘 수 있습니다.
-  // permissionText: {
-  //   textAlign: 'center',
-  //   marginTop: 10,
-  //   marginBottom: 10,
-  //   fontSize: 14,
-  //   color: 'gray',
-  // },
 });
