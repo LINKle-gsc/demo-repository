@@ -4,11 +4,16 @@ import { SwipeListView } from 'react-native-swipe-list-view';
 import Icon from 'react-native-vector-icons/Ionicons';
 
 // SavedTargetsScreen 컴포넌트 정의
-const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget }) => {
+const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, navigation }) => {
 
   const handleChatPress = (contactName) => {
-    // TODO: 추후 AI 대화 기능 연결
-    Alert.alert("Chat Feature", `Prepare chat with ${contactName} (Coming soon!)`);
+    // Alert.alert("Chat Feature", `Prepare chat with ${contactName} (Coming soon!)`); // 기존 알림 대신 네비게이션
+    if (navigation) {
+      navigation.navigate('Questions', { name: contactName });
+    } else {
+      console.error("Navigation prop is not available in SavedTargetsScreen");
+      Alert.alert("Error", "Cannot navigate to Question screen.");
+    }
   };
 
   const confirmDelete = (item) => {

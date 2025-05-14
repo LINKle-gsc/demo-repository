@@ -160,7 +160,7 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator>
+      <Stack.Navigator initialRouteName="SavedTargets">
         <Stack.Screen 
           name="Home" 
           component={HomeScreen} 
@@ -177,25 +177,29 @@ export default function App() {
           options={{ title: '추천 결과' }}
         />
         <Stack.Screen name="SavedTargets">
-          {() => (
+          {({ navigation }) => (
             <View style={styles.container}>
               <SavedTargetsScreen 
                 targetContacts={targetContacts}
                 onManageTargets={switchToDeviceContactsView}
                 onRemoveTarget={removeTargetContact}
+                navigation={navigation}
               />
             </View>
           )}
         </Stack.Screen>
         <Stack.Screen name="DeviceContacts">
-          {() => (
+          {({ navigation }) => (
             <View style={styles.container}>
               <DeviceContactsScreen
                 contacts={contacts}
                 selectedContacts={selectedContacts}
                 onToggleContact={toggleContactSelectionInDeviceScreen}
-                onSaveChanges={saveTargetsFromDeviceScreen}
-                onGoBack={() => navigation.navigate('SavedTargets')} // or use props
+                onSaveChanges={() => {
+                  saveTargetsFromDeviceScreen();
+                  navigation.navigate('SavedTargets');
+                }}
+                onGoBack={() => navigation.navigate('SavedTargets')}
               />
             </View>
           )}
