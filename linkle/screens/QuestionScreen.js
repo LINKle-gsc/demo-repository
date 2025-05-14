@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Text, View, TextInput, Button, SafeAreaView, Alert, ActivityIndicator, Share, TouchableOpacity, ScrollView } from 'react-native';
+import { Text, View, TextInput, Button, SafeAreaView, Alert, ActivityIndicator, Share, TouchableOpacity, ScrollView, StyleSheet as RNStyleSheet } from 'react-native';
 import { requestGeminiSuggestions } from '../api/QuestionApi';
 import { styles } from '../styles/QuestionStyles';
 
@@ -43,6 +43,22 @@ function ResultList({ title, items, selected, onSelect }) {
         </TouchableOpacity>
       ))}
     </>
+  );
+}
+
+// 커스텀 버튼 컴포넌트
+function CustomButton({ title, onPress, disabled, style, textStyle }) {
+  return (
+    <TouchableOpacity
+      style={[customButtonStyles.button, style, disabled && customButtonStyles.disabledButton]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+    >
+      <Text style={[customButtonStyles.buttonText, textStyle, disabled && customButtonStyles.disabledButtonText]}>
+        {title}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -110,13 +126,13 @@ export default function QuestionScreen({ navigation, route }) {
             placeholder={placeholderText}
             disabled={isLoading}
           />
-          <View style={styles.buttonContainer}>
-            <Button
+          <View style={[styles.buttonContainer, { paddingBottom: 60 }]}>
+            <CustomButton
               title="이전"
               onPress={handlePrevious}
               disabled={isFirstQuestion || isLoading}
             />
-            <Button
+            <CustomButton
               title={isLastQuestion ? "완료" : "다음"}
               onPress={handleNext}
               disabled={isLoading}
@@ -150,13 +166,48 @@ export default function QuestionScreen({ navigation, route }) {
           selected={selectedTopics}
           onSelect={idx => setSelectedTopics(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx])}
         />
-        <Button title="공유" onPress={() => {
-          const message =
-            '대화 시작:\n' + selectedStarters.map(i => `- ${starters[i]}`).join('\n') +
-            '\n\n주제:\n' + selectedTopics.map(i => `- ${topics[i]}`).join('\n');
-          Share.share({ message });
-        }}/>
+        <View style={{ marginBottom: 60 }}>
+          <Button title="공유" onPress={() => {
+            const message =
+              '대화 시작:\n' + selectedStarters.map(i => `- ${starters[i]}`).join('\n') +
+              '\n\n주제:\n' + selectedTopics.map(i => `- ${topics[i]}`).join('\n');
+            Share.share({ message });
+          }}/>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
-} 
+}
+
+// 커스텀 버튼 스타일
+const customButtonStyles = RNStyleSheet.create({
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,      // 세로 패딩 (기본 8에서 좀 더 키움)
+    paddingHorizontal: 16,  // 가로 패딩 (기본 8에서 좀 더 키움)
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100, // 버튼의 최소 너비 설정으로 크기 확보
+    marginHorizontal: 10, // 버튼 사이 간격
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16, // 폰트 크기 약간 키움
+    fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#A9A9A9', // 비활성화 시 배경색
+  },
+  disabledButtonText: {
+    color: '#D3D3D3', // 비활성화 시 텍스트 색
+  }
+});
+
+// QuestionStyles.js에 buttonContainer 스타일이 정의되어 있다고 가정합니다.
+// 예시: styles.buttonContainer = {
+//   flexDirection: 'row',
+//   justifyContent: 'space-around', // 또는 'space-between'
+//   width: '100%',
+//   marginTop: 20,
+// }; 

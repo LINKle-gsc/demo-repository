@@ -14,11 +14,13 @@ export default function HomeScreen({ navigation }) {
         onChangeText={setName}
         placeholder="이름을 입력하세요"
       />
-      <Button
-        title="질문 시작하기"
-        onPress={() => navigation.navigate('Questions', { name })}
-        disabled={!name.trim()}
-      />
+      <View style={{ marginBottom: 60 }}> 
+        <Button
+          title="질문 시작하기"
+          onPress={() => navigation.navigate('Questions', { name })}
+          disabled={!name.trim()}
+        />
+      </View>
       <StatusBar style="auto" />
     </View>
   );

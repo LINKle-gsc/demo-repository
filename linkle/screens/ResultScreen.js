@@ -29,7 +29,7 @@ export default function ResultScreen({ route }) {
 
   return (
     <SafeAreaView style={resultStyles.safeArea}>
-      <ScrollView contentContainerStyle={resultStyles.scrollContent}>
+      <ScrollView contentContainerStyle={[resultStyles.scrollContent, { paddingBottom: 60 }]}>
         {/* {rawText ? (
           <Text style={resultStyles.resultText}>{rawText}</Text>
         ) : null}  */}
