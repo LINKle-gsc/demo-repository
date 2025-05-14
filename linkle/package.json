@@ -10,7 +10,9 @@
   },
   "dependencies": {
     "@react-navigation/native-stack": "^7.3.12",
+    "dotenv": "^16.5.0",
     "expo": "~53.0.9",
+    "expo-constants": "^17.1.6",
     "expo-status-bar": "~2.2.3",
     "react": "19.0.0",
     "react-native": "0.79.2",
