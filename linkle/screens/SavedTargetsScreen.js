@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform, Alert, Modal, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, Alert, Modal, ActivityIndicator, SafeAreaView } from 'react-native';
 import { SwipeListView } from 'react-native-swipe-list-view';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Constants from 'expo-constants';
 // import LottieView from 'lottie-react-native'; // LottieView 임시 주석 처리
 
 // SavedTargetsScreen 컴포넌트 정의
@@ -69,7 +70,7 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
   );
 
   return (
-    <View style={styles.viewContainer}>
+    <SafeAreaView style={styles.viewContainer}>
       {/* Header View */}
       <View style={styles.headerContainer}>
         <View style={styles.headerButtonPlaceholder} />
@@ -115,7 +116,7 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
           <Text style={styles.lottieText}>Linkle하는중...</Text>
         </View>
       </Modal>
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -124,6 +125,7 @@ const styles = StyleSheet.create({
   viewContainer: {
     flex: 1,
     backgroundColor: '#f0f0f0', // 배경색 추가
+    paddingTop: Constants.statusBarHeight, // 상태 표시줄 높이만큼 패딩 추가
   },
   headerContainer: {
     flexDirection: 'row',

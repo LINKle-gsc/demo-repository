@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Platform, TextInput } from 'react-native';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Platform, TextInput, SafeAreaView } from 'react-native';
 import { CheckBox } from 'react-native-elements';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Constants from 'expo-constants';
 
 // DeviceContactsScreen 컴포넌트 정의
 const DeviceContactsScreen = ({
@@ -32,7 +33,7 @@ const DeviceContactsScreen = ({
   });
 
   return (
-    <View style={styles.viewContainer}>
+    <SafeAreaView style={styles.viewContainer}>
       <View style={styles.headerContainer}>
         <TouchableOpacity onPress={onGoBack} style={styles.headerButtonLeft}>
           <Icon name="chevron-back-outline" size={30} color="#007AFF" />
@@ -87,7 +88,7 @@ const DeviceContactsScreen = ({
         style={styles.list}
         keyboardShouldPersistTaps="handled"
       />
-    </View>
+    </SafeAreaView>
   );
 };
 
@@ -96,6 +97,7 @@ const styles = StyleSheet.create({
   viewContainer: {
     flex: 1,
     backgroundColor: '#f0f0f0',
+    paddingTop: Constants.statusBarHeight,
   },
   headerContainer: {
     flexDirection: 'row',
