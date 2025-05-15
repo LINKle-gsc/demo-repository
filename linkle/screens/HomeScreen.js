@@ -6,7 +6,7 @@ import { commonStyles } from '../styles/CommonStyles';
 export default function HomeScreen({ navigation }) {
   const [name, setName] = React.useState('');
   return (
-    <SafeAreaView style={commonStyles.container}>
+    <SafeAreaView style={[commonStyles.container, { flex: 1, backgroundColor: '#FFFFFF' }]}>
       <Text style={commonStyles.title}>LINKle</Text>
       <TextInput
         style={commonStyles.input}

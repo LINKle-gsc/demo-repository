@@ -124,7 +124,7 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
 const styles = StyleSheet.create({
   viewContainer: {
     flex: 1,
-    backgroundColor: '#f0f0f0', // 배경색 추가
+    backgroundColor: '#FFFFFF', // 배경색 추가
     paddingTop: Constants.statusBarHeight, // 상태 표시줄 높이만큼 패딩 추가
   },
   headerContainer: {

@@ -96,7 +96,7 @@ const DeviceContactsScreen = ({
 const styles = StyleSheet.create({
   viewContainer: {
     flex: 1,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: '#FFFFFF',
     paddingTop: Constants.statusBarHeight,
   },
   headerContainer: {
