@@ -11,10 +11,12 @@ import * as SplashScreen from 'expo-splash-screen'; // SplashScreen import 주�
 // 화면 구성용 컴포넌트
 import QuestionScreen from './screens/QuestionScreen';
 import HomeScreen from './screens/HomeScreen';
-import ResultScreen from './screens/ResultScreen';
+// import ResultScreen from './screens/ResultScreen'; // 기존 ResultScreen 주석 처리 또는 삭제
 import SavedTargetsScreen from './screens/SavedTargetsScreen';
 import DeviceContactsScreen from './screens/DeviceContactsScreen';
 import OnboardingScreen from './screens/OnboardingScreen'; // OnboardingScreen import 추가
+import TopicResultScreen from './screens/TopicResultScreen'; // TopicResultScreen import 추가
+import MessageResultScreen from './screens/MessageResultScreen'; // MessageResultScreen import 추가
 
 // 네이티브 스크린 최적화
 enableScreens();
@@ -24,6 +26,7 @@ const Stack = createNativeStackNavigator();
 
 // 연락처 관련 상수
 const SAVED_TARGET_CONTACTS_KEY = '@randomCallTargetContacts';
+const ONBOARDING_COMPLETED_KEY = '@onboardingCompleted'; // 온보딩 완료 키
 const VIEW_TYPES = {
   SAVED_TARGETS: 'SAVED_TARGETS',
   DEVICE_CONTACTS: 'DEVICE_CONTACTS',
@@ -38,12 +41,22 @@ export default function App() {
   const [selectedContacts, setSelectedContacts] = useState({});
   const [permissionStatus, setPermissionStatus] = useState(null);
   const [targetContacts, setTargetContacts] = useState([]);
+  const [showOnboarding, setShowOnboarding] = useState(null); // 온보딩 표시 여부 상태, null은 로딩 중
 
   useEffect(() => {
     async function prepareApp() {
       try {
         console.log("App useEffect triggered - Initial load and prepareApp");
-        // 초기 데이터 로딩
+        // 온보딩 완료 여부 확인
+        const onboardingStatus = await AsyncStorage.getItem(ONBOARDING_COMPLETED_KEY);
+        if (onboardingStatus === null) {
+          setShowOnboarding(true);
+          console.log("Onboarding not completed, setShowOnboarding(true)");
+        } else {
+          setShowOnboarding(false);
+          console.log("Onboarding completed, setShowOnboarding(false)");
+        }
+        
         await loadSavedTargetContacts();
         await requestInitialPermission();
         
@@ -51,8 +64,10 @@ export default function App() {
 
       } catch (e) {
         console.warn("Error during app preparation:", e);
+        // 실제 앱에서는 여기서 에러 처리를 좀 더 견고하게 할 수 있습니다.
+        // 예를 들어, 온보딩 상태 로드 실패 시 기본적으로 온보딩을 보여주도록 할 수 있습니다.
+        setShowOnboarding(true); // 에러 발생 시 안전하게 온보딩 표시
       } finally {
-        // 앱 준비 완료 상태로 설정
         setAppIsReady(true);
         console.log("App is ready, setting appIsReady to true.");
       }
@@ -63,15 +78,15 @@ export default function App() {
 
   // appIsReady 상태가 true가 되면 0.5초 후 스플래시 스크린을 숨깁니다.
   useEffect(() => {
-    if (appIsReady) {
-      console.log("appIsReady is true, attempting to hide splash screen after 1s delay.");
+    if (appIsReady && showOnboarding !== null) { // showOnboarding 상태도 로드 완료되었는지 확인
+      console.log("appIsReady and showOnboarding determined, attempting to hide splash screen after 0.5s delay.");
       const timer = setTimeout(async () => {
-        await SplashScreen.hideAsync(); // 주석 해제
+        await SplashScreen.hideAsync();
         console.log("Splash screen hidden.");
-      }, 1000);
+      }, 500); // 지연 시간 단축
       return () => clearTimeout(timer);
     }
-  }, [appIsReady]);
+  }, [appIsReady, showOnboarding]);
 
   const requestInitialPermission = async () => {
     console.log("Requesting initial contacts permission...");
@@ -91,7 +106,18 @@ export default function App() {
       console.log("Loaded saved target contacts:", saved.length);
     } catch (e) {
       console.error("Failed to load target contacts from AsyncStorage", e);
-      Alert.alert("Error", "Failed to load previously saved target contacts.");
+      // Alert.alert("Error", "Failed to load previously saved target contacts."); // 앱 초기 로딩 시 과도한 알림 방지
+    }
+  };
+
+  const handleOnboardingComplete = async () => {
+    try {
+      await AsyncStorage.setItem(ONBOARDING_COMPLETED_KEY, 'true');
+      setShowOnboarding(false);
+      console.log("Onboarding completed and status saved.");
+    } catch (e) {
+      console.error("Failed to save onboarding status", e);
+      Alert.alert("Error", "Failed to save onboarding status.");
     }
   };
 
@@ -184,28 +210,40 @@ export default function App() {
     }
   };
 
+  // 앱 로딩 중이거나 온보딩 상태 결정 전에는 스플래시 화면이 계속 보이도록 함
+  if (!appIsReady || showOnboarding === null) {
+    return null; // 또는 로딩 스피너 컴포넌트
+  }
+
+  // 온보딩 화면을 보여줘야 하는 경우
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+  }
+
+  // 온보딩 완료 후 메인 앱 네비게이션
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="Onboarding">
-        <Stack.Screen
-          name="Onboarding"
-          component={OnboardingScreen}
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
+      <Stack.Navigator initialRouteName="SavedTargets">
+        {/* HomeScreen은 현재 사용되지 않는 것으로 보이므로 필요시 주석 해제 또는 제거 */}
+        {/* <Stack.Screen 
           name="Home" 
           component={HomeScreen} 
           options={{ title: '홈' }}
-        />
+        /> */}
         <Stack.Screen 
           name="Questions" 
           component={QuestionScreen} 
-          options={{ title: '질문하기' }}
+          options={{ title: 'Revisit Memories' }}
         />
-        <Stack.Screen
-          name="Result"
-          component={ResultScreen}
-          options={{ title: '추천 결과' }}
+        <Stack.Screen 
+          name="TopicResult"
+          component={TopicResultScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen 
+          name="MessageResult"
+          component={MessageResultScreen}
+          options={{ headerShown: false }}
         />
         <Stack.Screen 
           name="SavedTargets"

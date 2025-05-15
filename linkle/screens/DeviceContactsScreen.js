@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, FlatList, TouchableOpacity, Platform, TextInput, SafeAreaView } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { StyleSheet, Text, View, FlatList, TouchableOpacity, Platform, TextInput, SafeAreaView, ActivityIndicator, StatusBar } from 'react-native';
 import { CheckBox } from 'react-native-elements';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Constants from 'expo-constants';
@@ -13,47 +13,39 @@ const DeviceContactsScreen = ({
   onGoBack,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [filteredContacts, setFilteredContacts] = useState(initialContacts);
 
-  // 검색어에 따라 연락처 필터링
-  const filteredContacts = initialContacts.filter(contact => {
-    const normalizedSearchTerm = searchTerm.normalize().toLowerCase(); // 검색어 정규화 및 소문자화
-    
-    // 이름 검색 로직 수정
-    const nameMatch = contact.name && 
-                      contact.name.normalize().toLowerCase().includes(normalizedSearchTerm);
-    
-    // 전화번호 검색 로직 (숫자 이외의 문자 제거 후 비교)
-    const phoneSearchTermDigits = normalizedSearchTerm.replace(/\D/g, '');
-    const phoneMatch = phoneSearchTermDigits.length > 0 && // 검색어에 숫자가 있을 경우에만 전화번호 검색 시도
-                       contact.phoneNumbers && 
-                       contact.phoneNumbers.some(phone => 
-                         phone.number && phone.number.replace(/\D/g, '').includes(phoneSearchTermDigits)
-                       );
-    return nameMatch || phoneMatch;
-  });
+  useEffect(() => {
+    setFilteredContacts(
+      initialContacts.filter(contact =>
+        contact.name.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+    );
+  }, [searchTerm, initialContacts]);
 
   return (
-    <SafeAreaView style={styles.viewContainer}>
-      <View style={styles.headerContainer}>
+    <SafeAreaView style={styles.safeArea}>
+      {/* StatusBar can be configured here if needed, e.g., barStyle="dark-content" */}
+      <View style={styles.header}>
         <TouchableOpacity onPress={onGoBack} style={styles.headerButtonLeft}>
-          <Icon name="chevron-back-outline" size={30} color="#007AFF" />
+          <Icon name="chevron-back-outline" size={30} color="#B08D57" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Select Targets</Text>
+        <Text style={styles.headerTitle}>Select Linkles</Text>
         <TouchableOpacity 
           onPress={onSaveChanges} 
           style={styles.headerButtonRight} 
-          disabled={initialContacts.length === 0 && Object.keys(selectedContacts).length === 0}
+          disabled={Object.keys(selectedContacts).length === 0} // Disable if no contacts are selected
         >
           <Text style={styles.saveButtonText}>Save</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.searchContainer}> 
-        <Icon name="search-outline" size={20} color="#8E8E93" style={styles.searchIcon} />
+        <Icon name="search-outline" size={20} color="#A9A9A9" style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Search by name or number..."
-          placeholderTextColor="#8E8E93"
+          placeholder="Search by name..."
+          placeholderTextColor="#A9A9A9"
           value={searchTerm}
           onChangeText={setSearchTerm}
           clearButtonMode="while-editing"
@@ -69,6 +61,7 @@ const DeviceContactsScreen = ({
               checked={!!selectedContacts[item.id]}
               onPress={() => onToggleContact(item.id)}
               containerStyle={styles.checkboxContainer}
+              checkedColor="#B08D57"
             />
             <View style={styles.contactInfoContainer}>
                 <Text style={styles.contactNameText}>{item.name}</Text>
@@ -92,22 +85,21 @@ const DeviceContactsScreen = ({
   );
 };
 
-// DeviceContactsScreen에 필요한 스타일
 const styles = StyleSheet.create({
-  viewContainer: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFCF4',
     paddingTop: Constants.statusBarHeight,
   },
-  headerContainer: {
+  header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 15,
     paddingVertical: Platform.OS === 'ios' ? 10 : 12,
+    backgroundColor: '#FFFCF4',
     borderBottomWidth: 1,
-    borderBottomColor: '#D1D1D6',
-    backgroundColor: Platform.OS === 'ios' ? '#F8F8F8' : '#FFFFFF',
+    borderBottomColor: '#E0D8C0',
   },
   headerButtonLeft: {
     padding: 5,
@@ -119,24 +111,22 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 17,
     fontWeight: Platform.OS === 'ios' ? '600' : 'bold',
-    color: '#000',
+    color: '#4A4031',
   },
   saveButtonText: {
-    color: '#007AFF',
+    color: '#B08D57',
     fontSize: 17,
     fontWeight: Platform.OS === 'ios' ? '600' : 'normal',
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Platform.OS === 'ios' ? '#EFEFF4' : '#FFFFFF',
+    backgroundColor: '#F8F5ED',
     paddingHorizontal: 15,
-    paddingVertical: Platform.OS === 'ios' ? 8 : 0,
-    marginHorizontal: Platform.OS === 'ios' ? 0 : 10,
-    marginVertical: Platform.OS === 'ios' ? 0 : 5,
-    borderBottomWidth: Platform.OS === 'ios' ? 1 : 0,
-    borderBottomColor: Platform.OS === 'ios' ? '#D1D1D6' : 'transparent',
-    borderRadius: Platform.OS === 'android' ? 5 : 0,
+    paddingVertical: Platform.OS === 'ios' ? 8 : 10,
+    marginHorizontal: 10,
+    marginVertical: 8,
+    borderRadius: 10,
   },
   searchIcon: {
     marginRight: 8,
@@ -145,8 +135,7 @@ const styles = StyleSheet.create({
     flex: 1,
     height: Platform.OS === 'ios' ? 30 : 40,
     fontSize: 16,
-    backgroundColor: 'transparent',
-    paddingHorizontal: Platform.OS === 'android' ? 10 : 0,
+    color: '#4A4031',
   },
   list: {
     flexGrow: 1,
@@ -154,37 +143,38 @@ const styles = StyleSheet.create({
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: '#EDEDED',
-    backgroundColor: '#fff',
     paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0D8C0',
+    backgroundColor: '#FFFCF4',
   },
   checkboxContainer: {
     padding: 0,
     margin: 0,
-    marginRight: 12,
+    marginRight: 15,
     backgroundColor: 'transparent',
     borderWidth: 0,
   },
   contactInfoContainer: {
-    flex: 1, 
+    flex: 1,
     justifyContent: 'center',
   },
   contactNameText: {
     fontSize: 17,
     fontWeight: '500',
+    color: '#4A4031',
   },
   contactPhoneText: {
     fontSize: 13,
-    color: '#555',
+    color: '#7A705F',
     marginTop: 2,
   },
   emptyListText: {
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,
-    color: '#777',
+    color: '#7A705F',
     paddingHorizontal: 20,
   },
 });
