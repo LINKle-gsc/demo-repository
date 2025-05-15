@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { StyleSheet, Text, View, Platform, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { NavigationContainer } from '@react-navigation/native';
@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { enableScreens } from 'react-native-screens';
 import * as Contacts from 'expo-contacts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SplashScreen from 'expo-splash-screen'; // SplashScreen import 주석 해제
 
 // 화면 구성용 컴포넌트
 import QuestionScreen from './screens/QuestionScreen';
@@ -27,17 +28,49 @@ const VIEW_TYPES = {
   DEVICE_CONTACTS: 'DEVICE_CONTACTS',
 };
 
+// 스플래시 화면이 자동으로 숨겨지는 것을 방지
+SplashScreen.preventAutoHideAsync(); // 주석 해제
+
 export default function App() {
+  const [appIsReady, setAppIsReady] = useState(false);
   const [contacts, setContacts] = useState([]);
   const [selectedContacts, setSelectedContacts] = useState({});
   const [permissionStatus, setPermissionStatus] = useState(null);
   const [targetContacts, setTargetContacts] = useState([]);
 
   useEffect(() => {
-    console.log("App useEffect triggered - Initial load");
-    loadSavedTargetContacts();
-    requestInitialPermission();
+    async function prepareApp() {
+      try {
+        console.log("App useEffect triggered - Initial load and prepareApp");
+        // 초기 데이터 로딩
+        await loadSavedTargetContacts();
+        await requestInitialPermission();
+        
+        console.log("Initial data loading complete.");
+
+      } catch (e) {
+        console.warn("Error during app preparation:", e);
+      } finally {
+        // 앱 준비 완료 상태로 설정
+        setAppIsReady(true);
+        console.log("App is ready, setting appIsReady to true.");
+      }
+    }
+
+    prepareApp();
   }, []);
+
+  // appIsReady 상태가 true가 되면 0.5초 후 스플래시 스크린을 숨깁니다.
+  useEffect(() => {
+    if (appIsReady) {
+      console.log("appIsReady is true, attempting to hide splash screen after 1s delay.");
+      const timer = setTimeout(async () => {
+        await SplashScreen.hideAsync(); // 주석 해제
+        console.log("Splash screen hidden.");
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [appIsReady]);
 
   const requestInitialPermission = async () => {
     console.log("Requesting initial contacts permission...");
@@ -46,7 +79,6 @@ export default function App() {
     console.log("Initial contacts permission status:", status);
     if (status !== 'granted') {
       console.log('Initial contacts permission denied or not determined.');
-      // 첫 로드 시에는 바로 Alert을 띄우지 않을 수 있음 (사용자가 버튼을 눌러 시도하도록 유도)
     }
   };
 
