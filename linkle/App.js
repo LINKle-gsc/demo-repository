@@ -14,6 +14,7 @@ import HomeScreen from './screens/HomeScreen';
 import ResultScreen from './screens/ResultScreen';
 import SavedTargetsScreen from './screens/SavedTargetsScreen';
 import DeviceContactsScreen from './screens/DeviceContactsScreen';
+import OnboardingScreen from './screens/OnboardingScreen'; // OnboardingScreen import 추가
 
 // 네이티브 스크린 최적화
 enableScreens();
@@ -185,7 +186,12 @@ export default function App() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator initialRouteName="SavedTargets">
+      <Stack.Navigator initialRouteName="Onboarding">
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen 
           name="Home" 
           component={HomeScreen} 
