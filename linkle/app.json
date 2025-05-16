@@ -8,12 +8,13 @@
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/splash-icon.png",
+      "image": "./assets/linkle_splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FAF7F0"
     },
     "plugins": [
-      "expo-contacts"
+      "expo-contacts",
+      "expo-splash-screen"
     ],
     "ios": {
       "supportsTablet": true,
@@ -25,7 +26,9 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.miniwa00.linkle"
+      "package": "com.miniwa00.linkle",
+      "navigationBarColor": "#FFFFFF",
+      "navigationBarIconColor": "dark"
     },
     "web": {
       "favicon": "./assets/favicon.png"

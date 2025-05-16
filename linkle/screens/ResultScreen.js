@@ -28,8 +28,8 @@ export default function ResultScreen({ route }) {
   const [selectedStarters, setSelectedStarters] = useState([]);
 
   return (
-    <SafeAreaView style={resultStyles.safeArea}>
-      <ScrollView contentContainerStyle={resultStyles.scrollContent}>
+    <SafeAreaView style={[resultStyles.safeArea, { flex: 1, backgroundColor: '#FFFFFF' }]}>
+      <ScrollView contentContainerStyle={[resultStyles.scrollContent, { paddingBottom: 60 }]}>
         {/* {rawText ? (
           <Text style={resultStyles.resultText}>{rawText}</Text>
         ) : null}  */}

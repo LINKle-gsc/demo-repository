@@ -1,14 +1,21 @@
-import React from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, Alert, Modal, ActivityIndicator, SafeAreaView } from 'react-native';
 import { SwipeListView } from 'react-native-swipe-list-view';
 import Icon from 'react-native-vector-icons/Ionicons';
+import Constants from 'expo-constants';
+// import LottieView from 'lottie-react-native'; // LottieView 임시 주석 처리
 
 // SavedTargetsScreen 컴포넌트 정의
-const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget }) => {
+const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, navigation }) => {
+  const [isLinking, setIsLinking] = useState(false);
 
   const handleChatPress = (contactName) => {
-    // TODO: 추후 AI 대화 기능 연결
-    Alert.alert("Chat Feature", `Prepare chat with ${contactName} (Coming soon!)`);
+    if (navigation) {
+      navigation.navigate('Questions', { name: contactName });
+    } else {
+      console.error("Navigation prop is not available in SavedTargetsScreen");
+      Alert.alert("Error", "Cannot navigate to Question screen.");
+    }
   };
 
   const confirmDelete = (item) => {
@@ -16,14 +23,8 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget })
       "Confirm Delete",
       `Are you sure you want to delete '${item.name}'?`,
       [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        {
-          text: "OK",
-          onPress: () => onRemoveTarget(item.id)
-        }
+        { text: "Cancel", style: "cancel" },
+        { text: "OK", onPress: () => onRemoveTarget(item.id) }
       ],
       { cancelable: false }
     );
@@ -31,9 +32,13 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget })
 
   const handleRandomSelect = () => {
     if (targetContacts && targetContacts.length > 0) {
-      const randomIndex = Math.floor(Math.random() * targetContacts.length);
-      const selectedContact = targetContacts[randomIndex];
-      handleChatPress(selectedContact.name); // 기존 알림 함수 재활용
+      setIsLinking(true);
+      setTimeout(() => {
+        const randomIndex = Math.floor(Math.random() * targetContacts.length);
+        const selectedContact = targetContacts[randomIndex];
+        handleChatPress(selectedContact.name);
+        setIsLinking(false);
+      }, 2500);
     } else {
       Alert.alert("No Targets", "No targets are saved, so a random selection cannot be made.");
     }
@@ -65,7 +70,7 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget })
   );
 
   return (
-    <View style={styles.viewContainer}>
+    <SafeAreaView style={styles.viewContainer}>
       {/* Header View */}
       <View style={styles.headerContainer}>
         <View style={styles.headerButtonPlaceholder} />
@@ -90,15 +95,28 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget })
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Random Select FAB */}
+      {/* Updated Random Select FAB */}
       <TouchableOpacity
         style={styles.fab}
         onPress={handleRandomSelect}
         activeOpacity={0.7}
+        disabled={isLinking}
       >
-        <Icon name="shuffle-outline" size={30} color="#FFF" />
+        <Text style={styles.fabText}>Linkle!</Text>
       </TouchableOpacity>
-    </View>
+
+      {/* Loading Modal with ActivityIndicator */}
+      <Modal
+        transparent={true}
+        animationType="fade"
+        visible={isLinking}
+      >
+        <View style={styles.lottieOverlay}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.lottieText}>Linkle하는중...</Text>
+        </View>
+      </Modal>
+    </SafeAreaView>
   );
 };
 
@@ -106,7 +124,8 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget })
 const styles = StyleSheet.create({
   viewContainer: {
     flex: 1,
-    backgroundColor: '#f0f0f0', // 배경색 추가
+    backgroundColor: '#FFFFFF', // 배경색 추가
+    paddingTop: Constants.statusBarHeight, // 상태 표시줄 높이만큼 패딩 추가
   },
   headerContainer: {
     flexDirection: 'row',
@@ -190,25 +209,36 @@ const styles = StyleSheet.create({
   },
   fab: {
     position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#007AFF', // iOS Blue, or choose another color
+    width: 150,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#007AFF',
     justifyContent: 'center',
     alignItems: 'center',
-    bottom: 30,
+    bottom: 60,
     alignSelf: 'center',
-    // iOS Shadow
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25,
     shadowRadius: 3.84,
-    // Android Shadow
     elevation: 5,
   },
+  fabText: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  lottieOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  lottieText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    marginTop: 10,
+  }
 });
 
 export default SavedTargetsScreen; 

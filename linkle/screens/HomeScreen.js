@@ -1,12 +1,12 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { View, Text, TextInput, Button } from 'react-native';
+import { View, Text, TextInput, Button, SafeAreaView } from 'react-native';
 import { commonStyles } from '../styles/CommonStyles';
 
 export default function HomeScreen({ navigation }) {
   const [name, setName] = React.useState('');
   return (
-    <View style={commonStyles.container}>
+    <SafeAreaView style={[commonStyles.container, { flex: 1, backgroundColor: '#FFFFFF' }]}>
       <Text style={commonStyles.title}>LINKle</Text>
       <TextInput
         style={commonStyles.input}
@@ -14,12 +14,14 @@ export default function HomeScreen({ navigation }) {
         onChangeText={setName}
         placeholder="이름을 입력하세요"
       />
-      <Button
-        title="질문 시작하기"
-        onPress={() => navigation.navigate('Questions', { name })}
-        disabled={!name.trim()}
-      />
+      <View style={{ marginBottom: 60 }}> 
+        <Button
+          title="질문 시작하기"
+          onPress={() => navigation.navigate('Questions', { name })}
+          disabled={!name.trim()}
+        />
+      </View>
       <StatusBar style="auto" />
-    </View>
+    </SafeAreaView>
   );
 } 

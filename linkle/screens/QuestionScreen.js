@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
-import { Text, View, TextInput, Button, SafeAreaView, Alert, ActivityIndicator, Share, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { Text, View, TextInput, Button, Alert, ActivityIndicator, Share, TouchableOpacity, ScrollView, StyleSheet as RNStyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { requestGeminiSuggestions } from '../api/QuestionApi';
-import { styles } from '../styles/QuestionStyles';
+import { styles as commonStyles } from '../styles/QuestionStyles';
+import Constants from 'expo-constants'; // For status bar height
 
 // 질문 상수
 const QUESTIONS = [
@@ -17,9 +19,9 @@ const QUESTIONS = [
 function QuestionInput({ question, value, onChange, placeholder, disabled }) {
   return (
     <>
-      <Text style={styles.question}>{question}</Text>
+      <Text style={commonStyles.question}>{question}</Text>
       <TextInput
-        style={styles.input}
+        style={commonStyles.input}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
@@ -34,10 +36,10 @@ function QuestionInput({ question, value, onChange, placeholder, disabled }) {
 function ResultList({ title, items, selected, onSelect }) {
   return (
     <>
-      <Text style={styles.heading}>{title}</Text>
+      <Text style={commonStyles.heading}>{title}</Text>
       {items.map((item, idx) => (
         <TouchableOpacity key={idx} onPress={() => onSelect(idx)}>
-          <Text style={selected.includes(idx) ? styles.selectedItem : styles.item}>
+          <Text style={selected.includes(idx) ? commonStyles.selectedItem : commonStyles.item}>
             {idx + 1}: {item}
           </Text>
         </TouchableOpacity>
@@ -46,10 +48,27 @@ function ResultList({ title, items, selected, onSelect }) {
   );
 }
 
+// 커스텀 버튼 컴포넌트
+function CustomButton({ title, onPress, disabled, style, textStyle }) {
+  return (
+    <TouchableOpacity
+      style={[customButtonStyles.button, style, disabled && customButtonStyles.disabledButton]}
+      onPress={onPress}
+      disabled={disabled}
+      activeOpacity={0.7}
+    >
+      <Text style={[customButtonStyles.buttonText, textStyle, disabled && customButtonStyles.disabledButtonText]}>
+        {title}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
 export default function QuestionScreen({ navigation, route }) {
   const name = route?.params?.name || '';
-  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [answers, setAnswers] = useState(Array(QUESTIONS.length).fill(''));
+  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0);
+  const [chatMessages, setChatMessages] = useState([]);
+  const [currentInputValue, setCurrentInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [stage, setStage] = useState('questions'); // 'questions' or 'result'
   const [starters, setStarters] = useState([]);
@@ -57,20 +76,74 @@ export default function QuestionScreen({ navigation, route }) {
   const [selectedStarters, setSelectedStarters] = useState([]);
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [resultText, setResultText] = useState('');
+  const flatListRef = useRef(null);
 
-  const handleAnswerChange = (text) => {
-    const newAnswers = [...answers];
-    newAnswers[currentQuestionIndex] = text;
-    setAnswers(newAnswers);
+  // 네비게이션 헤더 높이 (대략적인 값, 실제 앱에 맞게 조절 필요)
+  // StackNavigator의 기본 헤더를 사용하고 있다면 그 높이를 고려해야 합니다.
+  // 현재 QuestionScreen은 App.js에서 options={{ title: '질문하기' }}로 기본 헤더를 사용 중입니다.
+  // expo-constants statusBarHeight는 상태표시줄 높이이므로, 네비게이션 헤더 높이는 별도 계산 또는 고정값 사용.
+  // React Navigation의 기본 헤더 높이는 플랫폼과 버전에 따라 다를 수 있으나, 대략 56(Android) ~ 44+StatusBar(iOS)dp.
+  // 여기서는 iOS의 경우 Status Bar + Nav Bar를 합쳐서 대략적인 값을 줍니다.
+  const headerHeight = Platform.OS === 'ios' ? 44 + Constants.statusBarHeight : Constants.statusBarHeight + 56; 
+
+  useEffect(() => {
+    if (name && QUESTIONS.length > 0) {
+      const firstQuestionText = QUESTIONS[0].replaceAll('{name}', name);
+      setChatMessages([{ id: 'q0', type: 'question', text: firstQuestionText }]);
+      setActiveQuestionIndex(0); // 첫번째 질문으로 명시적 설정
+    }
+  }, [name]);
+
+  useEffect(() => {
+    if (flatListRef.current) {
+      flatListRef.current.scrollToEnd({ animated: true });
+    }
+  }, [chatMessages]);
+
+  const handleSendMessage = () => {
+    if (currentInputValue.trim() === '') return;
+
+    const newAnswer = { 
+      id: `a${activeQuestionIndex}`,
+      type: 'answer',
+      text: currentInputValue.trim()
+    };
+    
+    const nextQuestionIndex = activeQuestionIndex + 1;
+    let newMessages = [...chatMessages, newAnswer];
+
+    if (nextQuestionIndex < QUESTIONS.length) {
+      const nextQuestionText = QUESTIONS[nextQuestionIndex].replaceAll('{name}', name);
+      newMessages.push({ 
+        id: `q${nextQuestionIndex}`,
+        type: 'question',
+        text: nextQuestionText 
+      });
+      setActiveQuestionIndex(nextQuestionIndex);
+    } else {
+      // 모든 질문에 답변 완료. 여기서 API 호출 준비.
+      // 실제 API 호출은 "완료" 버튼 등을 통해 명시적으로 하도록 유도할 수 있음
+      // 여기서는 일단 다음 질문이 없다는 것만 표시 (예: 입력창 비활성화 또는 완료 버튼 표시)
+      setActiveQuestionIndex(nextQuestionIndex); // 인덱스를 질문 개수 이상으로 설정하여 완료 상태 표시
+    }
+    setChatMessages(newMessages);
+    setCurrentInputValue('');
   };
 
-  const isFirstQuestion = currentQuestionIndex === 0;
-  const isLastQuestion = currentQuestionIndex === QUESTIONS.length - 1;
-
-  // 완료 버튼 클릭 시
   const handleComplete = async () => {
     setIsLoading(true);
-    const result = await requestGeminiSuggestions({ answers, name });
+    const collectedAnswers = chatMessages
+      .filter(msg => msg.type === 'answer')
+      .map(msg => msg.text);
+    
+    // 모든 질문에 대한 답변이 수집되었는지 확인 (선택적)
+    if (collectedAnswers.length !== QUESTIONS.length) {
+        Alert.alert("답변 미완료", "모든 질문에 답변해주세요.");
+        setIsLoading(false);
+        return;
+    }
+
+    const result = await requestGeminiSuggestions({ answers: collectedAnswers, name });
     setIsLoading(false);
 
     if (result.ok) {
@@ -84,59 +157,73 @@ export default function QuestionScreen({ navigation, route }) {
       Alert.alert('오류', result.reason);
     }
   };
+  
+  const renderChatItem = ({ item }) => {
+    const messageStyle = item.type === 'question' ? chatStyles.questionBubble : chatStyles.answerBubble;
+    const textStyle = item.type === 'question' ? chatStyles.questionText : chatStyles.answerText;
+    const alignment = item.type === 'question' ? 'flex-start' : 'flex-end';
 
-  const handlePrevious = () => {
-    if (!isFirstQuestion) setCurrentQuestionIndex(currentQuestionIndex - 1);
+    return (
+      <View style={[chatStyles.messageRow, { justifyContent: alignment }]}>
+        <View style={[chatStyles.messageBubble, messageStyle]}>
+          <Text style={textStyle}>{item.text}</Text>
+        </View>
+      </View>
+    );
   };
 
-  const handleNext = () => {
-    if (!isLastQuestion) setCurrentQuestionIndex(currentQuestionIndex + 1);
-    else handleComplete();
-  };
-
-  // 질문 텍스트와 placeholder에 name 치환 적용
-  const questionText = QUESTIONS[currentQuestionIndex].replaceAll('{name}', name);
-  const placeholderText = `답변을 입력하세요. 예: ${name}`;
+  const allQuestionsAnswered = activeQuestionIndex >= QUESTIONS.length;
 
   // Conditionally render based on stage
   if (stage === 'questions') {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
-          <QuestionInput
-            question={questionText}
-            value={answers[currentQuestionIndex]}
-            onChange={handleAnswerChange}
-            placeholder={placeholderText}
-            disabled={isLoading}
+      <SafeAreaView style={[commonStyles.safeArea, { flex: 1, backgroundColor: '#F0F0F0' }]}>
+        <KeyboardAvoidingView 
+          behavior={Platform.OS === "ios" ? "padding" : "padding"}
+          style={{ flex: 1 }}
+          keyboardVerticalOffset={headerHeight}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={chatMessages}
+            renderItem={renderChatItem}
+            keyExtractor={item => item.id}
+            contentContainerStyle={chatStyles.chatListContainer}
+            ListEmptyComponent={<Text style={chatStyles.emptyChatText}>대화를 시작해주세요.</Text>}
+            style={{ flex: 1 }}
           />
-          <View style={styles.buttonContainer}>
-            <Button
-              title="이전"
-              onPress={handlePrevious}
-              disabled={isFirstQuestion || isLoading}
+          <View style={chatStyles.inputContainer}>
+            <TextInput
+              style={chatStyles.input}
+              value={currentInputValue}
+              onChangeText={setCurrentInputValue}
+              placeholder={allQuestionsAnswered ? "모든 질문에 답변했습니다." : "답변을 입력하세요..."}
+              editable={!isLoading && !allQuestionsAnswered}
+              onSubmitEditing={handleSendMessage}
             />
-            <Button
-              title={isLastQuestion ? "완료" : "다음"}
-              onPress={handleNext}
-              disabled={isLoading}
+            <CustomButton
+              title={allQuestionsAnswered ? "완료" : "전송"}
+              onPress={allQuestionsAnswered ? handleComplete : handleSendMessage}
+              disabled={isLoading || (currentInputValue.trim() === '' && !allQuestionsAnswered)}
+              style={chatStyles.sendButton}
+              textStyle={chatStyles.sendButtonText}
             />
           </View>
           {isLoading && (
-            <View style={styles.loadingOverlay}>
+            <View style={commonStyles.loadingOverlay}>
               <ActivityIndicator size="large" color="#007AFF" />
             </View>
           )}
-        </ScrollView>
+        </KeyboardAvoidingView>
       </SafeAreaView>
     );
   }
   // stage === 'result'
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.container}>
+    <SafeAreaView style={commonStyles.safeArea}>
+      <ScrollView contentContainerStyle={commonStyles.container}>
         {resultText ? (
-          <Text style={styles.resultText}>{resultText}</Text>
+          <Text style={commonStyles.resultText}>{resultText}</Text>
         ) : null}
         <ResultList
           title={`이렇게 ${name}님과의 대화를 시작해볼까요?`}
@@ -150,13 +237,114 @@ export default function QuestionScreen({ navigation, route }) {
           selected={selectedTopics}
           onSelect={idx => setSelectedTopics(prev => prev.includes(idx) ? prev.filter(i => i !== idx) : [...prev, idx])}
         />
-        <Button title="공유" onPress={() => {
-          const message =
-            '대화 시작:\n' + selectedStarters.map(i => `- ${starters[i]}`).join('\n') +
-            '\n\n주제:\n' + selectedTopics.map(i => `- ${topics[i]}`).join('\n');
-          Share.share({ message });
-        }}/>
+        <View style={{ marginBottom: 60 }}>
+          <Button title="공유" onPress={() => {
+            const message =
+              '대화 시작:\n' + selectedStarters.map(i => `- ${starters[i]}`).join('\n') +
+              '\n\n주제:\n' + selectedTopics.map(i => `- ${topics[i]}`).join('\n');
+            Share.share({ message });
+          }}/>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
-} 
+}
+
+// 채팅 UI를 위한 새로운 스타일
+const chatStyles = RNStyleSheet.create({
+  chatListContainer: {
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  messageRow: {
+    flexDirection: 'row',
+    marginBottom: 10,
+  },
+  messageBubble: {
+    padding: 10,
+    borderRadius: 15,
+    maxWidth: '80%',
+  },
+  questionBubble: {
+    backgroundColor: '#E5E5EA',
+    alignSelf: 'flex-start',
+    borderTopLeftRadius: 5,
+  },
+  answerBubble: {
+    backgroundColor: '#007AFF',
+    alignSelf: 'flex-end',
+    borderTopRightRadius: 5,
+  },
+  questionText: {
+    color: '#000000',
+    fontSize: 16,
+  },
+  answerText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#E0E0E0',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+    backgroundColor: '#F0F0F0',
+  },
+  input: {
+    flex: 1,
+    height: 48,
+    borderColor: '#D0D0D0',
+    borderWidth: 1,
+    borderRadius: 24,
+    paddingHorizontal: 18,
+    paddingVertical: 10,
+    marginRight: 10,
+    backgroundColor: '#FFFFFF',
+    fontSize: 16,
+  },
+  sendButton: {
+    paddingVertical: 12,
+    paddingHorizontal: 15,
+    minWidth: 'auto',
+    height: 48,
+    justifyContent: 'center',
+  },
+  sendButtonText: {
+    fontSize: 16,
+  },
+  emptyChatText:{
+    textAlign: 'center',
+    marginTop: 20,
+    fontSize: 16,
+    color: '#888'
+  }
+});
+
+// 기존 커스텀 버튼 스타일 (QuestionScreen 외부에 있을 경우 필요 없음)
+const customButtonStyles = RNStyleSheet.create({
+  button: {
+    backgroundColor: '#007AFF',
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    minWidth: 100,
+    marginHorizontal: 10,
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  disabledButton: {
+    backgroundColor: '#A9A9A9',
+  },
+  disabledButtonText: {
+    color: '#D3D3D3',
+  }
+}); 
