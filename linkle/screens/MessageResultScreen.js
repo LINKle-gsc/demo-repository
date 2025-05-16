@@ -49,6 +49,10 @@ export default function MessageResultScreen({ route, navigation }) {
     }
   };
 
+  const navigateToHome = () => {
+    navigation.navigate('SavedTargets');
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <View style={styles.container}>
@@ -57,7 +61,9 @@ export default function MessageResultScreen({ route, navigation }) {
             <Icon name="chevron-back-outline" size={wp(7.5)} color="#B08D57" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Message Suggestions</Text>
-          <View style={styles.headerButtonRightPlaceholder} />
+          <TouchableOpacity onPress={navigateToHome} style={styles.headerButtonRight}>
+            <Icon name="home-outline" size={wp(6.5)} color="#B08D57" />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.titleContainer}>
@@ -132,8 +138,7 @@ const styles = StyleSheet.create({
     fontWeight: Platform.OS === 'ios' ? '600' : 'bold',
     color: '#4A4031',
   },
-  headerButtonRightPlaceholder: {
-    width: wp(7.5),
+  headerButtonRight: {
     padding: wp(1.2),
   },
   titleContainer: {
