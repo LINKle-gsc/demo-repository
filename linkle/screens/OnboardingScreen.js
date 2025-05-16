@@ -13,15 +13,16 @@ const onboardingSlides = [
 ];
 
 // 온보딩 이미지 배경색과 유사한 색상 또는 기본 배경색
-const SCREEN_BACKGROUND_COLOR = '#FAF7F0'; // 예시 (스플래시 배경색과 유사하게)
+const SCREEN_BACKGROUND_COLOR = '#FFFCF4'; // 배경색 변경
 
-const OnboardingScreen = ({ navigation }) => {
+const OnboardingScreen = ({ onComplete }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
 
   const handleLetsLinklePress = () => {
-    // OnboardingScreen을 스택에서 제거하고 SavedTargets로 이동하여 뒤로 가기 방지
-    navigation.replace('SavedTargets'); 
+    if (onComplete) {
+      onComplete(); // onComplete 함수 호출
+    }
   };
 
   // 현재 보이는 슬라이드의 인덱스를 업데이트하는 함수
@@ -114,38 +115,39 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 5,
-    backgroundColor: '#C4C4C4', // 비활성 점 색상
+    backgroundColor: 'rgba(74, 64, 49, 0.4)', // 비활성 점 색상 (어두운 베이지 반투명)
     marginHorizontal: 6,
   },
   paginationDotActive: {
-    backgroundColor: '#007AFF', // 활성 점 색상 (예시)
+    backgroundColor: '#4A4031', // 활성 점 색상 (진한 베이지)
   },
   letsLinkleButton: {
     position: 'absolute',
-    bottom: Platform.OS === 'ios' ? 60 : 20, // 페이지네이션과의 간격을 고려하여 약간 위로 조정
-    backgroundColor: '#007AFF', // 버튼 배경색 (예시)
+    bottom: Platform.OS === 'ios' ? 40 : 30, // 페이지네이션과 겹치지 않도록 위치 조정, 더 낮게
+    backgroundColor: '#B08D57', // 버튼 배경색 (베이지 테마 강조색)
     paddingVertical: 14,
     paddingHorizontal: 35,
     borderRadius: 30,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2, // Android 그림자
-    shadowColor: '#000', // iOS 그림자
+    elevation: 2, 
+    shadowColor: '#000', 
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 2,
   },
   letsLinkleButtonText: {
-    color: '#FFFFFF',
+    color: '#FFFFFF', // 버튼 텍스트 색상 (흰색)
     fontSize: 18,
     fontWeight: 'bold',
     marginRight: 10,
   },
   letsLinkleButtonIcon: {
-    width: 30,
-    height: 30,
+    width: 20,
+    height: 20,
     resizeMode: 'contain',
+    tintColor: '#FFFFFF', // 아이콘 색상 (흰색)
   },
 });
 

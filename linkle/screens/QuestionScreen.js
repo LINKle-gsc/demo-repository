@@ -7,12 +7,12 @@ import Constants from 'expo-constants'; // For status bar height
 
 // 질문 상수
 const QUESTIONS = [
-  "당신은 {name}님을 어떻게 부르나요?",
-  "당신과 {name}님은 언제 처음 알게 되셨나요?",
-  "당신과 {name}님은 어떻게 만났나요?",
-  "당신과 {name}님과의 재밌는 에피소드가 있나요?",
-  "당신은 {name}님과 어떤 대화를 하고 싶으신가요?",
-  "당신과 {name}님과는 얼마나 자주 연락하시나요?"
+  "How do you usually call {name}?",
+  "When did you first get to know {name}?",
+  "How did you and {name} meet?",
+  "Do you have any fun memories or episodes with {name}?",
+  "What kind of conversation would you like to have with {name}?",
+  "How often do you and {name} stay in touch?"
 ];
 
 // 질문 입력 컴포넌트 분리
@@ -109,25 +109,25 @@ export default function QuestionScreen({ navigation, route }) {
       text: currentInputValue.trim()
     };
     
-    const nextQuestionIndex = activeQuestionIndex + 1;
-    let newMessages = [...chatMessages, newAnswer];
+    // 먼저 사용자 답변을 채팅에 표시
+    setChatMessages(prevMessages => [...prevMessages, newAnswer]);
+    setCurrentInputValue(''); // 입력창 비우기
 
-    if (nextQuestionIndex < QUESTIONS.length) {
-      const nextQuestionText = QUESTIONS[nextQuestionIndex].replaceAll('{name}', name);
-      newMessages.push({ 
-        id: `q${nextQuestionIndex}`,
-        type: 'question',
-        text: nextQuestionText 
-      });
-      setActiveQuestionIndex(nextQuestionIndex);
-    } else {
-      // 모든 질문에 답변 완료. 여기서 API 호출 준비.
-      // 실제 API 호출은 "완료" 버튼 등을 통해 명시적으로 하도록 유도할 수 있음
-      // 여기서는 일단 다음 질문이 없다는 것만 표시 (예: 입력창 비활성화 또는 완료 버튼 표시)
-      setActiveQuestionIndex(nextQuestionIndex); // 인덱스를 질문 개수 이상으로 설정하여 완료 상태 표시
-    }
-    setChatMessages(newMessages);
-    setCurrentInputValue('');
+    // 0.5초 지연 후 다음 질문 또는 완료 처리
+    setTimeout(() => {
+      const nextQuestionIndex = activeQuestionIndex + 1;
+      if (nextQuestionIndex < QUESTIONS.length) {
+        const nextQuestionText = QUESTIONS[nextQuestionIndex].replaceAll('{name}', name);
+        setChatMessages(prevMessages => [...prevMessages, { 
+          id: `q${nextQuestionIndex}`,
+          type: 'question',
+          text: nextQuestionText 
+        }]);
+        setActiveQuestionIndex(nextQuestionIndex);
+      } else {
+        setActiveQuestionIndex(nextQuestionIndex); // 모든 질문 완료 상태로 설정
+      }
+    }, 500); // 0.5초 지연
   };
 
   const handleComplete = async () => {
@@ -147,7 +147,7 @@ export default function QuestionScreen({ navigation, route }) {
     setIsLoading(false);
 
     if (result.ok) {
-      navigation.navigate('Result', {
+      navigation.navigate('TopicResult', {
         starters: result.starters,
         topics: result.topics,
         rawText: result.rawText,
@@ -177,7 +177,7 @@ export default function QuestionScreen({ navigation, route }) {
   // Conditionally render based on stage
   if (stage === 'questions') {
     return (
-      <SafeAreaView style={[commonStyles.safeArea, { flex: 1, backgroundColor: '#F0F0F0' }]}>
+      <SafeAreaView style={[commonStyles.safeArea, { flex: 1, backgroundColor: '#FFFCF4' }]}>
         <KeyboardAvoidingView 
           behavior={Platform.OS === "ios" ? "padding" : "padding"}
           style={{ flex: 1 }}
@@ -193,21 +193,33 @@ export default function QuestionScreen({ navigation, route }) {
             style={{ flex: 1 }}
           />
           <View style={chatStyles.inputContainer}>
-            <TextInput
-              style={chatStyles.input}
-              value={currentInputValue}
-              onChangeText={setCurrentInputValue}
-              placeholder={allQuestionsAnswered ? "모든 질문에 답변했습니다." : "답변을 입력하세요..."}
-              editable={!isLoading && !allQuestionsAnswered}
-              onSubmitEditing={handleSendMessage}
-            />
-            <CustomButton
-              title={allQuestionsAnswered ? "완료" : "전송"}
-              onPress={allQuestionsAnswered ? handleComplete : handleSendMessage}
-              disabled={isLoading || (currentInputValue.trim() === '' && !allQuestionsAnswered)}
-              style={chatStyles.sendButton}
-              textStyle={chatStyles.sendButtonText}
-            />
+            {allQuestionsAnswered ? (
+              <CustomButton
+                title="Ready to talk"
+                onPress={handleComplete}
+                disabled={isLoading}
+                style={[chatStyles.sendButton, chatStyles.readyButton]}
+                textStyle={chatStyles.sendButtonText}
+              />
+            ) : (
+              <>
+                <TextInput
+                  style={chatStyles.input}
+                  value={currentInputValue}
+                  onChangeText={setCurrentInputValue}
+                  placeholder={"Say something about this…"}
+                  editable={!isLoading}
+                  onSubmitEditing={handleSendMessage}
+                />
+                <CustomButton
+                  title={"Send"}
+                  onPress={handleSendMessage}
+                  disabled={isLoading || currentInputValue.trim() === ''}
+                  style={chatStyles.sendButton}
+                  textStyle={chatStyles.sendButtonText}
+                />
+              </>
+            )}
           </View>
           {isLoading && (
             <View style={commonStyles.loadingOverlay}>
@@ -266,21 +278,21 @@ const chatStyles = RNStyleSheet.create({
     maxWidth: '80%',
   },
   questionBubble: {
-    backgroundColor: '#E5E5EA',
+    backgroundColor: '#E0E0E0',
     alignSelf: 'flex-start',
     borderTopLeftRadius: 5,
   },
   answerBubble: {
-    backgroundColor: '#007AFF',
+    backgroundColor: '#FFFFFF',
     alignSelf: 'flex-end',
     borderTopRightRadius: 5,
   },
   questionText: {
-    color: '#000000',
+    color: '#333333',
     fontSize: 16,
   },
   answerText: {
-    color: '#FFFFFF',
+    color: '#007AFF',
     fontSize: 16,
   },
   inputContainer: {
@@ -289,22 +301,21 @@ const chatStyles = RNStyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: '#E0E0E0',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E0E0E0',
-    backgroundColor: '#F0F0F0',
+    borderTopColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: '#4A4031',
   },
   input: {
     flex: 1,
     height: 48,
-    borderColor: '#D0D0D0',
+    borderColor: 'rgba(255, 255, 255, 0.5)',
     borderWidth: 1,
     borderRadius: 24,
     paddingHorizontal: 18,
     paddingVertical: 10,
     marginRight: 10,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: '#FFFCF4',
     fontSize: 16,
+    color: '#333333',
   },
   sendButton: {
     paddingVertical: 12,
@@ -312,15 +323,22 @@ const chatStyles = RNStyleSheet.create({
     minWidth: 'auto',
     height: 48,
     justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: 24,
+  },
+  readyButton: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
   },
   sendButtonText: {
     fontSize: 16,
+    color: '#007AFF',
   },
   emptyChatText:{
     textAlign: 'center',
     marginTop: 20,
     fontSize: 16,
-    color: '#888'
+    color: '#FFFFFF'
   }
 });
 

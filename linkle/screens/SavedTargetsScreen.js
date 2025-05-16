@@ -1,13 +1,18 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform, Alert, Modal, ActivityIndicator, SafeAreaView } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, Alert, Modal, ActivityIndicator, SafeAreaView, StatusBar, Image, Dimensions } from 'react-native'; // Added Image, Dimensions
 import { SwipeListView } from 'react-native-swipe-list-view';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Constants from 'expo-constants';
-// import LottieView from 'lottie-react-native'; // LottieView 임시 주석 처리
+// import LottieView from 'lottie-react-native'; // LottieView import commented out for reversion
+
+const { width } = Dimensions.get('window'); // For image sizing
 
 // SavedTargetsScreen 컴포넌트 정의
 const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, navigation }) => {
   const [isLinking, setIsLinking] = useState(false);
+  // const lottieAnimationRef = useRef(null); // Not used in reverted version
+
+  // `общийСтиль` and `fixedStyles` are removed. The `styles` object at the bottom will be used.
 
   const handleChatPress = (contactName) => {
     if (navigation) {
@@ -32,13 +37,15 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
 
   const handleRandomSelect = () => {
     if (targetContacts && targetContacts.length > 0) {
-      setIsLinking(true);
+      setIsLinking(true); 
       setTimeout(() => {
         const randomIndex = Math.floor(Math.random() * targetContacts.length);
         const selectedContact = targetContacts[randomIndex];
-        handleChatPress(selectedContact.name);
-        setIsLinking(false);
-      }, 2500);
+        if (navigation && selectedContact) {
+          navigation.navigate('Questions', { name: selectedContact.name });
+        }
+        setIsLinking(false); 
+      }, 2000); 
     } else {
       Alert.alert("No Targets", "No targets are saved, so a random selection cannot be made.");
     }
@@ -53,63 +60,82 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
             )}
         </View>
         <TouchableOpacity onPress={() => handleChatPress(data.item.name)} style={styles.chatIconButton}>
-          <Icon name="chatbubbles-outline" size={24} color="#007AFF" />
+          <Icon name="chatbubbles-outline" size={24} color="#B08D57" />
         </TouchableOpacity>
-    </View>
+     </View>
   );
 
   const renderHiddenItem = (data, rowMap) => (
     <View style={styles.contactItemBack}>
-        <TouchableOpacity
-            style={[styles.backRightBtn, styles.backRightBtnRight]}
-            onPress={() => confirmDelete(data.item)}
-        >
-            <Icon name="trash-outline" size={26} color="#FFF" />
-        </TouchableOpacity>
+      <TouchableOpacity
+        style={[styles.backRightBtn, styles.backRightBtnRight]}
+        onPress={() => confirmDelete(data.item)}
+      >
+        <Icon name="trash-outline" size={26} color="#FFFFFF" />
+      </TouchableOpacity>
+    </View>
+  );
+  
+  const closeRow = (rowMap, rowKey) => {
+    if (rowMap[rowKey]) {
+      rowMap[rowKey].closeRow();
+    }
+  };
+
+  // Empty state component for SwipeListView
+  const renderEmptyListComponent = () => (
+    <View style={styles.emptyContainer}>
+      <Text style={styles.emptyListText}>
+        Wanna tap the + and Linkle with someone random?
+      </Text>
+      <Image 
+        source={require('../assets/all.png')} 
+        style={styles.emptyStateImage} 
+      />
     </View>
   );
 
   return (
     <SafeAreaView style={styles.viewContainer}>
-      {/* Header View */}
       <View style={styles.headerContainer}>
         <View style={styles.headerButtonPlaceholder} />
-        <Text style={styles.headerTitle}>Saved Targets ({targetContacts.length})</Text>
+        <Text style={styles.headerTitle}>Linkle List({targetContacts.length})</Text>
         <TouchableOpacity onPress={onManageTargets} style={styles.headerButtonRight}>
-          <Icon name="add-circle-outline" size={30} color="#007AFF" />
+          <Icon name="add-circle-outline" size={30} color="#B08D57" />
         </TouchableOpacity>
       </View>
 
       <SwipeListView
-        data={targetContacts}
+        data={targetContacts.map((contact, index) => ({ ...contact, key: `${index}` }))}
         renderItem={renderItem}
         renderHiddenItem={renderHiddenItem}
         rightOpenValue={-75}
-        previewRowKey={targetContacts.length > 0 ? targetContacts[0].id + '_target' : '0'}
+        previewRowKey={targetContacts.length > 0 ? '0' : null}
         previewOpenValue={-40}
         previewOpenDelay={1000}
-        disableRightSwipe={true}
+        disableRightSwipe={false}
         keyExtractor={item => item.id + '_target'}
-        ListEmptyComponent={<Text style={styles.emptyListText}>No call targets saved yet. Click '+' to add.</Text>}
+        ListEmptyComponent={renderEmptyListComponent} // Use the new empty component
         style={styles.list}
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Updated Random Select FAB */}
-      <TouchableOpacity
-        style={styles.fab}
-        onPress={handleRandomSelect}
-        activeOpacity={0.7}
-        disabled={isLinking}
-      >
-        <Text style={styles.fabText}>Linkle!</Text>
-      </TouchableOpacity>
+      {targetContacts.length > 0 && (
+        <TouchableOpacity
+          style={styles.fab}
+          onPress={handleRandomSelect}
+          activeOpacity={0.7}
+          disabled={isLinking}
+        >
+          <Text style={styles.fabText}>Linkle!</Text>
+        </TouchableOpacity>
+      )}
 
-      {/* Loading Modal with ActivityIndicator */}
       <Modal
         transparent={true}
         animationType="fade"
-        visible={isLinking}
+        visible={isLinking} 
+        onRequestClose={() => setIsLinking(false)}
       >
         <View style={styles.lottieOverlay}>
           <ActivityIndicator size="large" color="#FFFFFF" />
@@ -120,12 +146,12 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
   );
 };
 
-// SavedTargetsScreen에 필요한 스타일 (DeviceContactsScreen과 유사한 헤더 스타일 적용)
+// Original styles (to be used by the component)
 const styles = StyleSheet.create({
   viewContainer: {
     flex: 1,
-    backgroundColor: '#FFFFFF', // 배경색 추가
-    paddingTop: Constants.statusBarHeight, // 상태 표시줄 높이만큼 패딩 추가
+    backgroundColor: '#FFFCF4',
+    paddingTop: Constants.statusBarHeight, 
   },
   headerContainer: {
     flexDirection: 'row',
@@ -133,44 +159,43 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 15,
     paddingVertical: Platform.OS === 'ios' ? 10 : 12,
+    backgroundColor: '#FFFCF4',
     borderBottomWidth: 1,
-    borderBottomColor: '#D1D1D6',
-    backgroundColor: Platform.OS === 'ios' ? '#F8F8F8' : '#FFFFFF',
+    borderBottomColor: '#E0D8C0',
   },
-  headerButtonPlaceholder: { // 제목을 중앙에 두기 위한 왼쪽 공간 확보용
-    width: 30, // 아이콘 너비와 유사하게
+  headerButtonPlaceholder: { 
+    width: 30, 
     padding: 5,
   },
   headerButtonRight: {
-    padding: 5, // 아이콘 터치 영역 확보
+    padding: 5, 
   },
   headerTitle: {
     fontSize: 17,
     fontWeight: Platform.OS === 'ios' ? '600' : 'bold',
-    color: '#000',
+    color: '#4A4031',
   },
   list: {
     flexGrow: 1,
-    // paddingHorizontal: 20, // contactItem에서 패딩 관리
+    backgroundColor: '#FFFCF4', // Ensure list background is also beige
   },
-  contactItemFront: { // 보이는 부분 스타일
+  contactItemFront: { 
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 12,
     paddingHorizontal: 20, 
     borderBottomWidth: 1,
-    borderBottomColor: '#EDEDED',
-    backgroundColor: '#fff', 
-    height: 'auto', // 내용에 따라 높이 자동 조절
+    borderBottomColor: '#E0D8C0',
+    backgroundColor: '#FFFCF4',
+    height: 'auto', 
   },
-  contactItemBack: { // 숨겨진 부분 스타일
+  contactItemBack: { 
     alignItems: 'center',
-    backgroundColor: '#FF3B30', // 삭제 배경색
+    backgroundColor: '#FF3B30',
     flex: 1,
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    // paddingLeft: 15, // 필요 없음
   },
   contactInfoWrapper: {
     flex: 1,
@@ -180,19 +205,31 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: '500',
     marginBottom: 2,
+    color: '#4A4031',
   },
   contactPhone: {
     fontSize: 13,
-    color: '#555',
+    color: '#7A705F',
+  },
+  emptyContainer: { // Container for empty state content
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+    backgroundColor: '#FFFCF4',
   },
   emptyListText: {
     textAlign: 'center',
-    marginTop: 50, // 헤더 높이 고려
     fontSize: 16,
-    color: '#777',
-    paddingHorizontal: 20,
+    color: '#7A705F',
+    marginBottom: 20, // Add some space above the image
   },
-  chatIconButton: { // 기존 removeIconButton에서 이름 변경
+  emptyStateImage: {
+    width: width * 0.6, // Adjust width as needed
+    height: width * 0.6 * (3/4), // Assuming a 4:3 aspect ratio, adjust as needed
+    resizeMode: 'contain',
+  },
+  chatIconButton: { 
     padding: 8,
   },
   backRightBtn: {
@@ -201,7 +238,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     position: 'absolute',
     top: 0,
-    width: 75, // rightOpenValue와 동일하게
+    width: 75, 
   },
   backRightBtnRight: {
     backgroundColor: '#FF3B30',
@@ -212,7 +249,7 @@ const styles = StyleSheet.create({
     width: 150,
     height: 50,
     borderRadius: 25,
-    backgroundColor: '#007AFF',
+    backgroundColor: '#B08D57',
     justifyContent: 'center',
     alignItems: 'center',
     bottom: 60,
