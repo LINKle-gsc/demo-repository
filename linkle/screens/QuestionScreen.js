@@ -17,7 +17,7 @@ const BASE_QUESTIONS_TEMPLATES = [
 ];
 
 // API에 전달할 질문 개선 지침
-const REFINEMENT_PROMPT_VARIABLE = `Based on the user's previous answer, please refine the upcoming base question to make the conversation with their friend ({name}) more personal and in-depth, while keeping the core intent of the base question. The refined question must include {name}'s name. Please keep it concise and use a friendly tone.`;
+const REFINEMENT_PROMPT_VARIABLE = `Based on the user's previous answer, please refine the upcoming base question to make the conversation with user's friend ({name}) more personal and in-depth, while keeping the core intent of the base question. The refined question must include {name}'s name. Please keep it concise and use a friendly tone. Keep in mind that you are talking to the user, NOT to {name}. Do NOT start conversation with user's friend name ({name}).`;
 
 // 질문 입력 컴포넌트 분리
 function QuestionInput({ question, value, onChange, placeholder, disabled }) {
@@ -76,7 +76,7 @@ export default function QuestionScreen({ navigation, route }) {
   // 로딩 상태 분리
   const [isLoadingNextQuestion, setIsLoadingNextQuestion] = useState(false);
   const [isLoadingCompletion, setIsLoadingCompletion] = useState(false);
-  const [stage, setStage] = useState('questions'); 
+  const [stage, setStage] = useState('questions');
   const [starters, setStarters] = useState([]);
   const [topics, setTopics] = useState([]);
   const [selectedStarters, setSelectedStarters] = useState([]);
@@ -94,12 +94,12 @@ export default function QuestionScreen({ navigation, route }) {
   // expo-constants statusBarHeight는 상태표시줄 높이이므로, 네비게이션 헤더 높이는 별도 계산 또는 고정값 사용.
   // React Navigation의 기본 헤더 높이는 플랫폼과 버전에 따라 다를 수 있으나, 대략 56(Android) ~ 44+StatusBar(iOS)dp.
   // 여기서는 iOS의 경우 Status Bar + Nav Bar를 합쳐서 대략적인 값을 줍니다.
-  const headerHeight = Platform.OS === 'ios' ? 44 + Constants.statusBarHeight : Constants.statusBarHeight + 56; 
+  const headerHeight = Platform.OS === 'ios' ? 44 + Constants.statusBarHeight : Constants.statusBarHeight + 56;
 
   useEffect(() => {
     if (name) {
-      setChatMessages([]); 
-      setActiveQuestionIndex(0); 
+      setChatMessages([]);
+      setActiveQuestionIndex(0);
       const initialQuestionText = FIRST_QUESTION.replaceAll('{name}', name);
       setFirstQuestionActualText(initialQuestionText); // 첫 번째 질문 실제 텍스트 저장
       setFirstAnswerActualText(''); // 이름 변경 시 첫 번째 답변 초기화
@@ -127,12 +127,12 @@ export default function QuestionScreen({ navigation, route }) {
     const currentQuestionMessage = chatMessages.filter(msg => msg.type === 'question').slice(-1)[0];
     const immediatePreviousQuestionText = currentQuestionMessage?.text || "";
 
-    const newAnswer = { 
+    const newAnswer = {
       id: 'a' + activeQuestionIndex,
       type: 'answer',
       text: userAnswer
     };
-        
+
     // 첫 번째 질문에 대한 답변인 경우 저장
     if (activeQuestionIndex === 0) {
       setFirstAnswerActualText(userAnswer);
@@ -140,7 +140,7 @@ export default function QuestionScreen({ navigation, route }) {
 
     setChatMessages(prevMessages => [...prevMessages, newAnswer]);
     setCurrentInputValue('');
-    
+
     const nextQuestionCycleIndex = activeQuestionIndex + 1; // 다음에 진행할 질문 사이클 (1-5)
 
     if (nextQuestionCycleIndex < TOTAL_QUESTIONS) {
@@ -149,48 +149,48 @@ export default function QuestionScreen({ navigation, route }) {
         // nextQuestionCycleIndex는 1, 2, 3, 4가 될 수 있음.
         // BASE_QUESTIONS_TEMPLATES의 인덱스는 0, 1, 2, 3이 됨.
         const baseQuestionTemplateIndex = nextQuestionCycleIndex - 1;
-        
+
         // 배열 범위 확인 추가
         if (baseQuestionTemplateIndex < BASE_QUESTIONS_TEMPLATES.length) {
-            const baseQuestionToRefine = BASE_QUESTIONS_TEMPLATES[baseQuestionTemplateIndex].replaceAll('{name}', name);
-            
-            // API에 전달할 첫 번째 질문/답변 (Q3부터 유효)
-            const q1TextForApi = activeQuestionIndex >= 1 ? firstQuestionActualText : null;
-            const a1TextForApi = activeQuestionIndex >= 1 ? firstAnswerActualText : null;
+          const baseQuestionToRefine = BASE_QUESTIONS_TEMPLATES[baseQuestionTemplateIndex].replaceAll('{name}', name);
 
-            const response = await requestRefinedQuestion(
-              name,
-              baseQuestionToRefine,
-              immediatePreviousQuestionText, // 바로 이전 질문
-              userAnswer,                 // 바로 이전 답변 (현재 제출된 답변)
-              REFINEMENT_PROMPT_VARIABLE,
-              q1TextForApi,                // 첫 번째 질문 텍스트 (Q3부터 전달)
-              a1TextForApi                 // 첫 번째 답변 텍스트 (Q3부터 전달)
-            );
+          // API에 전달할 첫 번째 질문/답변 (Q3부터 유효)
+          const q1TextForApi = activeQuestionIndex >= 1 ? firstQuestionActualText : null;
+          const a1TextForApi = activeQuestionIndex >= 1 ? firstAnswerActualText : null;
 
-            if (response.ok && response.refinedQuestion) {
-              setChatMessages(prevMessages => [...prevMessages, {
-                id: 'q' + nextQuestionCycleIndex,
-                type: 'question',
-                text: response.refinedQuestion // API가 {name}을 이미 처리했다고 가정, 필요시 .replaceAll('{name}', name)
-              }]);
-              setActiveQuestionIndex(nextQuestionCycleIndex);
-            } else {
-              Alert.alert('다음 질문 생성 실패', response.reason || '다음 질문을 받아오는데 실패했습니다. 기본 질문으로 표시합니다.');
-              // API 실패 시, 기본 템플릿 질문이라도 보여주기
-              setChatMessages(prevMessages => [...prevMessages, {
-                id: 'q' + nextQuestionCycleIndex,
-                type: 'question',
-                text: baseQuestionToRefine // 기본 템플릿 사용
-              }]);
-              setActiveQuestionIndex(nextQuestionCycleIndex);
-            }
+          const response = await requestRefinedQuestion(
+            name,
+            baseQuestionToRefine,
+            immediatePreviousQuestionText, // 바로 이전 질문
+            userAnswer,                 // 바로 이전 답변 (현재 제출된 답변)
+            REFINEMENT_PROMPT_VARIABLE,
+            q1TextForApi,                // 첫 번째 질문 텍스트 (Q3부터 전달)
+            a1TextForApi                 // 첫 번째 답변 텍스트 (Q3부터 전달)
+          );
+
+          if (response.ok && response.refinedQuestion) {
+            setChatMessages(prevMessages => [...prevMessages, {
+              id: 'q' + nextQuestionCycleIndex,
+              type: 'question',
+              text: response.refinedQuestion // API가 {name}을 이미 처리했다고 가정, 필요시 .replaceAll('{name}', name)
+            }]);
+            setActiveQuestionIndex(nextQuestionCycleIndex);
+          } else {
+            Alert.alert('다음 질문 생성 실패', response.reason || '다음 질문을 받아오는데 실패했습니다. 기본 질문으로 표시합니다.');
+            // API 실패 시, 기본 템플릿 질문이라도 보여주기
+            setChatMessages(prevMessages => [...prevMessages, {
+              id: 'q' + nextQuestionCycleIndex,
+              type: 'question',
+              text: baseQuestionToRefine // 기본 템플릿 사용
+            }]);
+            setActiveQuestionIndex(nextQuestionCycleIndex);
+          }
         } else {
-            // 이 경우는 발생하지 않아야 하지만, 안전장치로 추가
-            console.error("BASE_QUESTIONS_TEMPLATES 인덱스 오류", baseQuestionTemplateIndex);
-            Alert.alert("오류", "질문 목록 구성에 문제가 있습니다.");
-            setIsLoadingNextQuestion(false); // 로딩 중단
-            return; // 함수 종료
+          // 이 경우는 발생하지 않아야 하지만, 안전장치로 추가
+          console.error("BASE_QUESTIONS_TEMPLATES 인덱스 오류", baseQuestionTemplateIndex);
+          Alert.alert("오류", "질문 목록 구성에 문제가 있습니다.");
+          setIsLoadingNextQuestion(false); // 로딩 중단
+          return; // 함수 종료
         }
       } catch (error) {
         Alert.alert('질문 생성 오류', '다음 질문을 생성하는 중 오류가 발생했습니다. 기본 질문으로 표시합니다.');
@@ -198,16 +198,16 @@ export default function QuestionScreen({ navigation, route }) {
         // 오류 발생 시에도 기본 질문 템플릿을 사용하려고 시도 (인덱스 확인 필요)
         const baseQuestionTemplateIndexOnError = nextQuestionCycleIndex - 1;
         if (baseQuestionTemplateIndexOnError < BASE_QUESTIONS_TEMPLATES.length) {
-            const baseQuestionToRefineOnError = BASE_QUESTIONS_TEMPLATES[baseQuestionTemplateIndexOnError].replaceAll('{name}', name);
-            setChatMessages(prevMessages => [...prevMessages, {
-                id: 'q' + nextQuestionCycleIndex,
-                type: 'question',
-                text: baseQuestionToRefineOnError
-            }]);
-            setActiveQuestionIndex(nextQuestionCycleIndex);
+          const baseQuestionToRefineOnError = BASE_QUESTIONS_TEMPLATES[baseQuestionTemplateIndexOnError].replaceAll('{name}', name);
+          setChatMessages(prevMessages => [...prevMessages, {
+            id: 'q' + nextQuestionCycleIndex,
+            type: 'question',
+            text: baseQuestionToRefineOnError
+          }]);
+          setActiveQuestionIndex(nextQuestionCycleIndex);
         } else {
-            console.error("Catch - BASE_QUESTIONS_TEMPLATES 인덱스 오류", baseQuestionTemplateIndexOnError);
-            Alert.alert("오류", "질문 목록 구성에 문제가 있어 다음 질문을 표시할 수 없습니다.");
+          console.error("Catch - BASE_QUESTIONS_TEMPLATES 인덱스 오류", baseQuestionTemplateIndexOnError);
+          Alert.alert("오류", "질문 목록 구성에 문제가 있어 다음 질문을 표시할 수 없습니다.");
         }
       }
       setIsLoadingNextQuestion(false); // 다음 질문 로딩 종료
@@ -222,11 +222,11 @@ export default function QuestionScreen({ navigation, route }) {
     const collectedAnswers = chatMessages
       .filter(msg => msg.type === 'answer')
       .map(msg => msg.text);
-    
+
     if (collectedAnswers.length !== TOTAL_QUESTIONS) {
-        Alert.alert("답변 미완료", `모든 질문(${TOTAL_QUESTIONS}개)에 답변해주세요.`);
-        setIsLoadingCompletion(false);
-        return;
+      Alert.alert("답변 미완료", `모든 질문(${TOTAL_QUESTIONS}개)에 답변해주세요.`);
+      setIsLoadingCompletion(false);
+      return;
     }
 
     // 두 API 호출을 병렬 또는 순차적으로 실행
@@ -237,7 +237,7 @@ export default function QuestionScreen({ navigation, route }) {
 
       // 2. 대화 주제 및 스타터 요청
       const suggestionsResult = await requestGeminiSuggestions({ answers: collectedAnswers, name });
-      
+
       setIsLoadingCompletion(false); // 모든 API 호출 후 로딩 종료
 
       if (suggestionsResult.ok) {
@@ -257,7 +257,7 @@ export default function QuestionScreen({ navigation, route }) {
       Alert.alert('오류 발생', '결과를 처리하는 중 문제가 발생했습니다.');
     }
   };
-  
+
   const renderChatItem = ({ item }) => {
     const messageStyle = item.type === 'question' ? styles.questionBubble : styles.answerBubble;
     const textStyle = item.type === 'question' ? styles.questionText : styles.answerText;
@@ -278,7 +278,7 @@ export default function QuestionScreen({ navigation, route }) {
   if (stage === 'questions') {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <KeyboardAvoidingView 
+        <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : "padding"}
           style={{ flex: 1 }}
           keyboardVerticalOffset={headerHeight}
@@ -310,7 +310,7 @@ export default function QuestionScreen({ navigation, route }) {
                   onChangeText={setCurrentInputValue}
                   placeholder={"Say something about this…"}
                   placeholderTextColor="#A9A9A9"
-                  editable={!isLoading} 
+                  editable={!isLoading}
                   onSubmitEditing={handleSendMessage}
                 />
                 <TouchableOpacity
@@ -324,7 +324,7 @@ export default function QuestionScreen({ navigation, route }) {
               </>
             )}
           </View>
-          {isLoading && ( 
+          {isLoading && (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#B08D57" />
               {isLoadingCompletion ? (
@@ -363,7 +363,7 @@ export default function QuestionScreen({ navigation, route }) {
               '대화 시작:\n' + selectedStarters.map(i => `- ${starters[i]}`).join('\n') +
               '\n\n주제:\n' + selectedTopics.map(i => `- ${topics[i]}`).join('\n');
             Share.share({ message });
-          }}/>
+          }} />
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -375,7 +375,7 @@ const styles = RNStyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#FFFCF4',
-    paddingTop: Constants.statusBarHeight, 
+    paddingTop: Constants.statusBarHeight,
   },
   chatListContainer: {
     paddingVertical: 10,
@@ -394,7 +394,7 @@ const styles = RNStyleSheet.create({
   questionBubble: {
     backgroundColor: '#F8F5ED',
     alignSelf: 'flex-start',
-    borderTopLeftRadius: 6, 
+    borderTopLeftRadius: 6,
   },
   answerBubble: {
     backgroundColor: '#FFFFFF',
@@ -419,18 +419,18 @@ const styles = RNStyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 10,
     borderTopWidth: 1,
-    borderTopColor: '#E0D8C0', 
+    borderTopColor: '#E0D8C0',
     backgroundColor: '#FFFCF4',
   },
   input: {
     flex: 1,
     height: 48,
-    borderColor: '#E0D8C0', 
+    borderColor: '#E0D8C0',
     borderWidth: 1,
-    borderRadius: 24, 
+    borderRadius: 24,
     paddingHorizontal: 18,
     marginRight: 10,
-    backgroundColor: '#FFFFFF', 
+    backgroundColor: '#FFFFFF',
     fontSize: 16,
     color: '#4A4031',
   },
@@ -444,16 +444,16 @@ const styles = RNStyleSheet.create({
     borderRadius: 24,
     minWidth: 80,
   },
-  readyButton: { 
+  readyButton: {
     flex: 1,
-    backgroundColor: '#B08D57', 
+    backgroundColor: '#B08D57',
   },
   sendButtonText: {
     fontSize: 16,
-    color: '#FFFFFF', 
+    color: '#FFFFFF',
     fontWeight: '600',
   },
-  emptyChatText:{
+  emptyChatText: {
     textAlign: 'center',
     marginTop: 50,
     fontSize: 16,

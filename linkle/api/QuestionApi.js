@@ -20,6 +20,8 @@ export async function requestGeminiSuggestions({ answers, name }) {
 Based on the user's answers below about their relationship with ${name}, please recommend 3-5 conversation starters and 3-5 interesting topics.
 
 **Output Format (Crucial):**
+- Clearly distinguish between the user and the friend named ${name}.
+- Never refer to the user as ${name} under any circumstances.
 - Provide ONLY two lists: one for starters and one for topics.
 - Each list item MUST begin with a hyphen ('-').
 - Do NOT include any extra explanations, numbering, or other text.
@@ -40,7 +42,7 @@ Based on the user's answers below about their relationship with ${name}, please 
 
 User's answers regarding ${name}:
 ${answers.map((a, i) => `Q${i + 1}: ${a}`).join('\n')}`;
-  
+
   const url = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
 
   try {
@@ -87,8 +89,8 @@ ${answers.map((a, i) => `Q${i + 1}: ${a}`).join('\n')}`;
       if (trimmed.startsWith('-')) {
         const itemText = trimmed.replace(/^-\s*/, '');
         if (itemText) { // 빈 항목 추가 방지
-            if (currentSection === 'starters') starters.push(itemText);
-            else if (currentSection === 'topics') topics.push(itemText);
+          if (currentSection === 'starters') starters.push(itemText);
+          else if (currentSection === 'topics') topics.push(itemText);
         }
       }
     });
@@ -96,9 +98,9 @@ ${answers.map((a, i) => `Q${i + 1}: ${a}`).join('\n')}`;
     // 만약 starters나 topics가 비어있다면, rawText에서 파싱이 제대로 안된 것일 수 있음.
     // 이 경우, 사용자에게 rawText라도 보여주거나, 다른 fallback 처리 고려.
     if (starters.length === 0 && topics.length === 0 && rawText !== '[No response text]') {
-        console.warn("Could not parse starters/topics, but rawText is available:", rawText);
-        // 예시: topics에 rawText의 일부를 넣어주거나, 특정 메시지 전달
-        // topics.push("Could not parse specific topics, please refer to the raw response if needed.");
+      console.warn("Could not parse starters/topics, but rawText is available:", rawText);
+      // 예시: topics에 rawText의 일부를 넣어주거나, 특정 메시지 전달
+      // topics.push("Could not parse specific topics, please refer to the raw response if needed.");
     }
 
     return { ok: true, starters, topics, rawText };
@@ -178,7 +180,7 @@ Example (the actual content will vary greatly based on input, but the response m
             parts: [{ text: systemPrompt }],
           },
         ],
-        generationConfig: { 
+        generationConfig: {
           responseMimeType: "application/json",
         }
       }),
@@ -201,7 +203,7 @@ Example (the actual content will vary greatly based on input, but the response m
     if (!rawJsonText) {
       return { ok: false, reason: 'API로부터 유효한 다음 질문 데이터를 받지 못했습니다 (No text part).' };
     }
-    
+
     rawJsonText = rawJsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
 
     try {
@@ -270,7 +272,7 @@ Example:
             parts: [{ text: systemPrompt }],
           },
         ],
-        generationConfig: { 
+        generationConfig: {
           responseMimeType: "application/json",
         }
       }),
@@ -293,7 +295,7 @@ Example:
     if (!rawJsonText) {
       return { ok: false, reason: 'API로부터 유효한 요약 데이터를 받지 못했습니다 (No text part).' };
     }
-    
+
     rawJsonText = rawJsonText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
 
     try {
