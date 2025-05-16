@@ -10,6 +10,7 @@ const { width } = Dimensions.get('window'); // For image sizing
 // SavedTargetsScreen 컴포넌트 정의
 const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, navigation }) => {
   const [isLinking, setIsLinking] = useState(false);
+  const [highlightedContactId, setHighlightedContactId] = useState(null); // 선택된 연락처 ID 저장 상태
   // const lottieAnimationRef = useRef(null); // Not used in reverted version
 
   // `общийСтиль` and `fixedStyles` are removed. The `styles` object at the bottom will be used.
@@ -37,15 +38,44 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
 
   const handleRandomSelect = () => {
     if (targetContacts && targetContacts.length > 0) {
-      setIsLinking(true); 
-      setTimeout(() => {
-        const randomIndex = Math.floor(Math.random() * targetContacts.length);
-        const selectedContact = targetContacts[randomIndex];
-        if (navigation && selectedContact) {
-          navigation.navigate('Questions', { name: selectedContact.name });
-        }
-        setIsLinking(false); 
-      }, 2000); 
+      const randomIndex = Math.floor(Math.random() * targetContacts.length);
+      const selectedContact = targetContacts[randomIndex];
+
+      if (selectedContact) {
+        Alert.alert(
+          "Confirm Selection",
+          `'${selectedContact.name}'님과 Linkle 하시겠습니까?`,
+          [
+            {
+              text: "취소",
+              style: "cancel",
+              onPress: () => {
+                // 이전 하이라이트 초기화 (선택 취소 시)
+                setHighlightedContactId(null); 
+              }
+            },
+            {
+              text: "Linkle 시작",
+              onPress: () => {
+                setIsLinking(true);
+                // 이전 하이라이트 초기화 (새로운 선택 시)
+                // setHighlightedContactId(null); // 원한다면 여기에 추가하여 매번 초기화 가능
+
+                setTimeout(() => {
+                  if (selectedContact) { // setTimeout 내부에서도 selectedContact가 유효한지 확인
+                    setHighlightedContactId(selectedContact.id); // 선택된 연락처 ID 설정
+                  }
+                  if (navigation && selectedContact) {
+                    navigation.navigate('Questions', { name: selectedContact.name });
+                  }
+                  setIsLinking(false);
+                }, 2000);
+              }
+            }
+          ],
+          { cancelable: true, onDismiss: () => setHighlightedContactId(null) } // Alert 외부를 탭하여 닫을 때도 하이라이트 초기화
+        );
+      }
     } else {
       Alert.alert("No Targets", "No targets are saved, so a random selection cannot be made.");
     }
@@ -54,7 +84,12 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
   const renderItem = (data, rowMap) => (
     <View style={styles.contactItemFront}>
         <View style={styles.contactInfoWrapper}>
-            <Text style={styles.contactName} numberOfLines={1} ellipsizeMode="tail">{data.item.name}</Text>
+            <View style={styles.contactNameContainer}> 
+              <Text style={styles.contactName} numberOfLines={1} ellipsizeMode="tail">{data.item.name}</Text>
+              {data.item.id === highlightedContactId && (
+                <Icon name="checkmark-circle-outline" size={22} color="#4CAF50" style={styles.checkIcon} />
+              )}
+            </View>
             {data.item.phoneNumbers && data.item.phoneNumbers[0] && (
             <Text style={styles.contactPhone} numberOfLines={1} ellipsizeMode="tail">{data.item.phoneNumbers[0].number}</Text>
             )}
@@ -201,11 +236,18 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
+  contactNameContainer: { // 이름과 체크 아이콘을 위한 컨테이너
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   contactName: {
     fontSize: 17,
     fontWeight: '500',
     marginBottom: 2,
     color: '#4A4031',
+  },
+  checkIcon: { // 체크 아이콘 스타일
+    marginLeft: 8,
   },
   contactPhone: {
     fontSize: 13,
