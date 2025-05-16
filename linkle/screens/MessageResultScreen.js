@@ -1,124 +1,21 @@
 import React, { useState } from 'react';
-import { Text, View, SafeAreaView, Share, ScrollView, TouchableOpacity, Image, StyleSheet, Dimensions, Platform, ImageBackground } from 'react-native';
-import Icon from 'react-native-vector-icons/Ionicons'; // Import Icon
-// import { resultStyles as originalResultStyles } from '../styles/ResultStyles'; // 기존 스타일 삭제 또는 주석 처리
+import { Text, View, SafeAreaView, Share, ScrollView, TouchableOpacity, StyleSheet, Dimensions, Platform } from 'react-native';
+import Icon from 'react-native-vector-icons/Ionicons';
+import Constants from 'expo-constants';
 
 const { width, height } = Dimensions.get('window');
 
-// 메시지 추천 화면 스타일
-const messageSuggestionStyles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#FFFCF4', // 배경색 변경
-  },
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    // justifyContent: 'space-between', // 상단부터 순차적으로 배치하도록 변경
-    paddingTop: height * 0.05,
-    paddingBottom: height * 0.05,
-    paddingHorizontal: 20,
-  },
-  navigationHeader: { // 이전 버튼을 위한 컨테이너
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'flex-start',
-    alignItems: 'center',
-    marginBottom: 15,
-  },
-  backButton: {
-    flexDirection: 'row', // 아이콘과 텍스트를 나란히 배치
-    alignItems: 'center',
-    paddingVertical: 8,
-    // paddingHorizontal: 12, // 아이콘과 텍스트 사이 간격은 marginLeft로
-  },
-  backButtonIconStyle: { // Renamed from backButtonIcon for clarity, as it's a style for Icon
-    // fontSize is now size prop for Icon
-    // color is now color prop for Icon
-    marginRight: 5, 
-  },
-  backButtonText: {
-    fontSize: 16,
-    color: '#4A4031', // Adjusted for beige theme
-    fontWeight: '500',
-  },
-  titleContainer: {
-    alignItems: 'center',
-    marginBottom: 20, 
-  },
-  mainTitle: {
-    fontSize: 28, 
-    fontWeight: 'bold',
-    color: '#4A4031', // Adjusted for beige theme
-    textAlign: 'center',
-  },
-  subTitle: {
-    fontSize: 16,
-    color: '#7A705F', // Adjusted for beige theme
-    marginTop: 5,
-    textAlign: 'center',
-    marginBottom: 20, // 메시지 목록과의 간격
-  },
-  contentContainer: { 
-    flex: 1, 
-    width: '100%',
-    alignItems: 'center',
-    // justifyContent: 'center', // 더 이상 중앙 정렬 필요 없음
-  },
-  // textholderContainer 및 textholderBackground 삭제
-  startersListContainer: {
-    flex: 1, 
-    width: '100%',
-    backgroundColor: 'rgba(248, 245, 237, 0.8)', // Lighter beige with opacity
-    borderRadius: 10,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginBottom: 20, // 하단 버튼과의 간격
-  },
-  starterItemTouchable: {
-    paddingVertical: 12, // Increased padding
-    borderBottomWidth: 1, 
-    borderBottomColor: '#E0D8C0', // Softer border for beige
-  },
-  starterItemText: {
-    fontSize: 16, 
-    color: '#4A4031', // Adjusted for beige theme
-    lineHeight: 24,
-  },
-  selectedStarterItemText: {
-    fontSize: 16, 
-    color: '#FFFFFF', 
-    fontWeight: 'bold',
-    lineHeight: 24,
-    backgroundColor: '#B08D57', // Accent color for selection background
-    borderRadius: 5,
-    paddingVertical: 6, // Added padding
-    paddingHorizontal: 10, // Added padding
-    overflow: 'hidden', // Ensure background respects borderRadius
-  },
-  // allPngImage 삭제
-  connectButton: {
-    backgroundColor: '#B08D57', // Accent color for button
-    paddingVertical: 18,
-    paddingHorizontal: 20,
-    borderRadius: 30,
-    width: width * 0.8,
-    alignItems: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 1,
-    // marginTop: 10, // contentContainer의 marginBottom으로 대체 또는 유지
-  },
-  connectButtonText: {
-    color: '#FFFFFF', // White text on accent button
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-});
+// 반응형 크기 계산 헬퍼 함수
+const wp = (percentage) => {
+  const value = (percentage * width) / 100;
+  return Math.round(value);
+};
+const hp = (percentage) => {
+  const value = (percentage * height) / 100;
+  return Math.round(value);
+};
 
-export default function MessageResultScreen({ route, navigation }) { // navigation prop 추가
+export default function MessageResultScreen({ route, navigation }) {
   const { starters = [], name = '' } = route.params || {};
   const [selectedStartersIndices, setSelectedStartersIndices] = useState([]);
 
@@ -127,81 +24,194 @@ export default function MessageResultScreen({ route, navigation }) { // navigati
     "Here is another great suggestion to start a conversation!",
     "What about asking this interesting question?",
     "A fourth option to break the ice.",
-    "And one more for good measure."
+    // "And one more for good measure."
   ];
 
   const toggleStarterSelection = (index) => {
     setSelectedStartersIndices(prev =>
       prev.includes(index)
         ? prev.filter(i => i !== index)
-        : [...prev, index]
+        : [index] // 단일 선택으로 변경 (하나만 선택 가능하게)
     );
   };
 
   const handleShare = () => {
     let messageToShare = "";
     if (selectedStartersIndices.length > 0) {
-      messageToShare = selectedStartersIndices.map(i => displayStarters[i]).join('\n\n');
+      messageToShare = displayStarters[selectedStartersIndices[0]]; // 단일 선택된 메시지
     } else if (displayStarters.length > 0) {
-      messageToShare = displayStarters[0]; // Default to sharing the first one if none selected
+      messageToShare = displayStarters[0];
     }
     if (messageToShare) {
       Share.share({ message: messageToShare });
     } else {
-      Share.share({ message: "Linkle에서 추천하는 대화 시작 메시지!"}); // Fallback if displayStarters is also empty
+      Share.share({ message: "Check out this message suggestion from Linkle!" });
     }
   };
 
   return (
-    <SafeAreaView style={messageSuggestionStyles.safeArea}>
-      <View style={messageSuggestionStyles.container}>
-        <View style={messageSuggestionStyles.navigationHeader}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={messageSuggestionStyles.backButton}>
-            <Icon 
-              name="chevron-back-outline" 
-              size={26} // Adjusted size
-              color="#B08D57" // Accent color for beige theme
-              style={messageSuggestionStyles.backButtonIconStyle} 
-            />
-            <Text style={messageSuggestionStyles.backButtonText}>주제 다시 선택</Text> 
+    <SafeAreaView style={styles.safeArea}>
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButtonLeft}>
+            <Icon name="chevron-back-outline" size={wp(7.5)} color="#B08D57" />
           </TouchableOpacity>
+          <Text style={styles.headerTitle}>Message Suggestions</Text>
+          <View style={styles.headerButtonRightPlaceholder} />
         </View>
 
-        <View style={messageSuggestionStyles.titleContainer}>
-          <Text style={messageSuggestionStyles.mainTitle}>Choose a message you like</Text>
-          <Text style={messageSuggestionStyles.subTitle}>... and hit the button!</Text>
+        <View style={styles.titleContainer}>
+          <Text style={styles.mainTitle}>Choose a message you like</Text>
+          <Text style={styles.subTitle}>... and tap the button to share!</Text>
         </View>
 
-        <View style={messageSuggestionStyles.contentContainer}>
-          {/* ImageBackground 및 textholderContainer 삭제 */}
-          <ScrollView 
-            style={messageSuggestionStyles.startersListContainer}
-            showsVerticalScrollIndicator={false}
-            // contentContainerStyle={{ paddingTop: 20, paddingBottom: 20}} // ScrollView 스타일에 이미 패딩 적용
-          >
-            {displayStarters.map((starter, index) => (
-              <TouchableOpacity 
-                key={index} 
-                onPress={() => toggleStarterSelection(index)}
-                style={messageSuggestionStyles.starterItemTouchable}
-              >
+        {/* contentContainer 제거, ScrollView가 flex:1 차지하도록 */}
+        <ScrollView 
+          style={styles.startersListContainer}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.startersListContentContainer}
+        >
+          {displayStarters.slice(0, 4).map((starter, index) => (
+            <TouchableOpacity 
+              key={index} 
+              onPress={() => toggleStarterSelection(index)}
+              style={styles.starterItemTouchable}
+              activeOpacity={0.7}
+            >
+              <View style={selectedStartersIndices.includes(index) ? styles.selectedStarterItemView : null}>
                 <Text 
                   style={selectedStartersIndices.includes(index) 
-                    ? messageSuggestionStyles.selectedStarterItemText 
-                    : messageSuggestionStyles.starterItemText}
+                    ? styles.selectedStarterItemText 
+                    : styles.starterItemText}
                 >
-                  {index + 1}. {starter}
+                  {/* 번호 제거, 메시지만 표시 */}
+                  {starter}
                 </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {/* all.png Image 삭제 */}
-        </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
 
-        <TouchableOpacity style={messageSuggestionStyles.connectButton} onPress={handleShare}>
-          <Text style={messageSuggestionStyles.connectButtonText}>Shall we connect?</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomButtonContainer}>
+          <TouchableOpacity style={styles.connectButton} onPress={handleShare}  disabled={selectedStartersIndices.length === 0 && displayStarters.length > 0} activeOpacity={0.7}>
+            <Text style={styles.connectButtonText}>Share this message</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
-} 
+}
+
+// TopicResultScreen.js의 디자인을 적용한 새로운 스타일
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#FFFCF4',
+    paddingTop: Constants.statusBarHeight,
+  },
+  container: {
+    flex: 1,
+    alignItems: 'center',
+    paddingHorizontal: wp(5),
+    paddingBottom: Platform.OS === 'ios' ? hp(1.5) : hp(1.5),
+  },
+  header: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: Platform.OS === 'ios' ? hp(1.2) : hp(1.5),
+    backgroundColor: '#FFFCF4',
+    marginBottom: hp(1.5),
+  },
+  headerButtonLeft: {
+    padding: wp(1.2),
+  },
+  headerTitle: {
+    fontSize: wp(4.5),
+    fontWeight: Platform.OS === 'ios' ? '600' : 'bold',
+    color: '#4A4031',
+  },
+  headerButtonRightPlaceholder: {
+    width: wp(7.5),
+    padding: wp(1.2),
+  },
+  titleContainer: {
+    alignItems: 'center',
+    marginVertical: hp(2),
+    width: '100%',
+  },
+  mainTitle: {
+    fontSize: wp(6.5),
+    fontWeight: 'bold',
+    color: '#4A4031',
+    textAlign: 'center',
+    marginBottom: hp(1),
+  },
+  subTitle: {
+    fontSize: wp(4),
+    color: '#7A705F',
+    textAlign: 'center',
+    marginBottom: hp(2.5),
+  },
+  startersListContainer: { // ScrollView 스타일
+    flex: 1, 
+    width: '100%',
+    backgroundColor: '#F8F5ED',
+    borderRadius: 15,
+    marginBottom: hp(1.5), 
+  },
+  startersListContentContainer: { // ScrollView 내부 컨텐츠 정렬
+    paddingVertical: hp(1.5),
+    paddingHorizontal: wp(3), // 내부 좌우 패딩 살짝 줄임
+  },
+  starterItemTouchable: {
+    paddingVertical: hp(1.8), // 터치 영역 확보
+    borderBottomWidth: 1, 
+    borderBottomColor: '#E0D8C0',
+  },
+  starterItemTouchableLast: { // 마지막 항목의 하단 보더 제거 (필요시)
+    borderBottomWidth: 0,
+  },
+  starterItemText: {
+    fontSize: wp(4),
+    color: '#4A4031',
+    lineHeight: wp(6),
+  },
+  selectedStarterItemView: { // 선택된 항목을 감싸는 View에 배경색 및 패딩 적용
+    backgroundColor: '#B08D57',
+    borderRadius: 8,
+    paddingVertical: hp(1.2),
+    paddingHorizontal: wp(3.5),
+  },
+  selectedStarterItemText: { 
+    fontSize: wp(4),
+    color: '#FFFFFF', 
+    fontWeight: '500',
+    lineHeight: wp(6),
+  },
+  bottomButtonContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: Platform.OS === 'android' ? hp(5) : hp(2.5),
+    paddingTop: hp(1.5),
+  },
+  connectButton: {
+    backgroundColor: '#B08D57',
+    paddingVertical: hp(2.2),
+    paddingHorizontal: wp(5),
+    borderRadius: 30,
+    width: wp(85),
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  connectButtonText: {
+    color: '#FFFFFF',
+    fontSize: wp(4.5),
+    fontWeight: 'bold',
+  },
+}); 

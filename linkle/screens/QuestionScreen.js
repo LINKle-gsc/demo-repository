@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Text, View, TextInput, Button, Alert, ActivityIndicator, Share, TouchableOpacity, ScrollView, StyleSheet as RNStyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { requestGeminiSuggestions, requestRefinedQuestion } from '../api/QuestionApi';
+import { requestGeminiSuggestions, requestRefinedQuestion, requestConversationSummary } from '../api/QuestionApi';
 import { styles as commonStylesFromQuestionStyles } from '../styles/QuestionStyles'; // 기존 스타일 임포트 이름 변경
 import Constants from 'expo-constants'; // For status bar height
 
@@ -17,7 +17,7 @@ const BASE_QUESTIONS_TEMPLATES = [
 ];
 
 // API에 전달할 질문 개선 지침
-const REFINEMENT_PROMPT_VARIABLE = `이전 사용자의 답변 내용을 참고하고, 다음에 제시될 기본 질문의 핵심 의도는 유지하면서, 친구 ({name})와의 대화가 좀 더 개인적이고 깊이 있게 이어질 수 있도록 질문을 자연스럽게 개선해주세요. 개선된 질문에는 {name}의 이름이 포함되어야 합니다. 너무 길지 않게, 친근한 말투로 수정해주세요.`;
+const REFINEMENT_PROMPT_VARIABLE = `Based on the user's previous answer, please refine the upcoming base question to make the conversation with their friend ({name}) more personal and in-depth, while keeping the core intent of the base question. The refined question must include {name}'s name. Please keep it concise and use a friendly tone.`;
 
 // 질문 입력 컴포넌트 분리
 function QuestionInput({ question, value, onChange, placeholder, disabled }) {
@@ -73,8 +73,9 @@ export default function QuestionScreen({ navigation, route }) {
   const [activeQuestionIndex, setActiveQuestionIndex] = useState(0); // 현재 몇 번째 *질문 사이클*인지 (0-4)
   const [chatMessages, setChatMessages] = useState([]);
   const [currentInputValue, setCurrentInputValue] = useState('');
-  const [isLoading, setIsLoading] = useState(false); // 답변 처리 및 다음 질문 개선 중 로딩
-  // isLoadingQuestions는 첫 질문이 고정되므로 크게 필요하지 않음
+  // 로딩 상태 분리
+  const [isLoadingNextQuestion, setIsLoadingNextQuestion] = useState(false);
+  const [isLoadingCompletion, setIsLoadingCompletion] = useState(false);
   const [stage, setStage] = useState('questions'); 
   const [starters, setStarters] = useState([]);
   const [topics, setTopics] = useState([]);
@@ -103,6 +104,13 @@ export default function QuestionScreen({ navigation, route }) {
       setFirstQuestionActualText(initialQuestionText); // 첫 번째 질문 실제 텍스트 저장
       setFirstAnswerActualText(''); // 이름 변경 시 첫 번째 답변 초기화
       setChatMessages([{ id: 'q0', type: 'question', text: initialQuestionText }]);
+      // ResultList 관련 상태 초기화 (필요시)
+      setStarters([]);
+      setTopics([]);
+      setSelectedStarters([]);
+      setSelectedTopics([]);
+      setResultText('');
+      setStage('questions'); // stage도 초기화
     }
   }, [name]);
 
@@ -136,7 +144,7 @@ export default function QuestionScreen({ navigation, route }) {
     const nextQuestionCycleIndex = activeQuestionIndex + 1; // 다음에 진행할 질문 사이클 (1-5)
 
     if (nextQuestionCycleIndex < TOTAL_QUESTIONS) {
-      setIsLoading(true);
+      setIsLoadingNextQuestion(true); // 다음 질문 로딩 시작
       try {
         // nextQuestionCycleIndex는 1, 2, 3, 4가 될 수 있음.
         // BASE_QUESTIONS_TEMPLATES의 인덱스는 0, 1, 2, 3이 됨.
@@ -181,7 +189,7 @@ export default function QuestionScreen({ navigation, route }) {
             // 이 경우는 발생하지 않아야 하지만, 안전장치로 추가
             console.error("BASE_QUESTIONS_TEMPLATES 인덱스 오류", baseQuestionTemplateIndex);
             Alert.alert("오류", "질문 목록 구성에 문제가 있습니다.");
-            setIsLoading(false); // 로딩 중단
+            setIsLoadingNextQuestion(false); // 로딩 중단
             return; // 함수 종료
         }
       } catch (error) {
@@ -202,7 +210,7 @@ export default function QuestionScreen({ navigation, route }) {
             Alert.alert("오류", "질문 목록 구성에 문제가 있어 다음 질문을 표시할 수 없습니다.");
         }
       }
-      setIsLoading(false);
+      setIsLoadingNextQuestion(false); // 다음 질문 로딩 종료
     } else {
       setActiveQuestionIndex(nextQuestionCycleIndex); // 모든 질문 완료 (TOTAL_QUESTIONS 도달)
       // 이제 handleComplete를 누를 수 있게 됨
@@ -210,29 +218,43 @@ export default function QuestionScreen({ navigation, route }) {
   };
 
   const handleComplete = async () => {
-    setIsLoading(true);
+    setIsLoadingCompletion(true); // 완료 API 호출 로딩 시작
     const collectedAnswers = chatMessages
       .filter(msg => msg.type === 'answer')
       .map(msg => msg.text);
     
     if (collectedAnswers.length !== TOTAL_QUESTIONS) {
         Alert.alert("답변 미완료", `모든 질문(${TOTAL_QUESTIONS}개)에 답변해주세요.`);
-        setIsLoading(false);
+        setIsLoadingCompletion(false);
         return;
     }
 
-    const result = await requestGeminiSuggestions({ answers: collectedAnswers, name });
-    setIsLoading(false);
+    // 두 API 호출을 병렬 또는 순차적으로 실행
+    try {
+      // 1. 대화 요약 요청
+      const summaryResponse = await requestConversationSummary(name, chatMessages);
+      const conversationSummary = summaryResponse.ok ? summaryResponse.summary : "Could not retrieve conversation summary.";
 
-    if (result.ok) {
-      navigation.navigate('TopicResult', {
-        starters: result.starters,
-        topics: result.topics,
-        rawText: result.rawText,
-        name,
-      });
-    } else {
-      Alert.alert('Linkle 생성 실패', result.reason || '결과를 가져오는데 실패했습니다.');
+      // 2. 대화 주제 및 스타터 요청
+      const suggestionsResult = await requestGeminiSuggestions({ answers: collectedAnswers, name });
+      
+      setIsLoadingCompletion(false); // 모든 API 호출 후 로딩 종료
+
+      if (suggestionsResult.ok) {
+        navigation.navigate('TopicResult', {
+          starters: suggestionsResult.starters,
+          topics: suggestionsResult.topics,
+          rawText: suggestionsResult.rawText, // requestGeminiSuggestions의 rawText도 전달
+          name,
+          conversationSummary: conversationSummary // 생성된 요약 전달
+        });
+      } else {
+        Alert.alert('Linkle 생성 실패', suggestionsResult.reason || '결과를 가져오는데 실패했습니다.');
+      }
+    } catch (error) {
+      setIsLoadingCompletion(false);
+      console.error("Error during completion process:", error);
+      Alert.alert('오류 발생', '결과를 처리하는 중 문제가 발생했습니다.');
     }
   };
   
@@ -251,6 +273,7 @@ export default function QuestionScreen({ navigation, route }) {
   };
 
   const allQuestionsAnswered = activeQuestionIndex >= TOTAL_QUESTIONS;
+  const isLoading = isLoadingNextQuestion || isLoadingCompletion; // 통합 로딩 상태
 
   if (stage === 'questions') {
     return (
@@ -304,7 +327,11 @@ export default function QuestionScreen({ navigation, route }) {
           {isLoading && ( 
             <View style={styles.loadingOverlay}>
               <ActivityIndicator size="large" color="#B08D57" />
-              <Text style={styles.loadingText}>다음 질문을 만들고 있어요...</Text>
+              {isLoadingCompletion ? (
+                <Text style={styles.loadingText}>Generating summary & topics...</Text>
+              ) : (
+                <Text style={styles.loadingText}>Generating next question...</Text>
+              )}
             </View>
           )}
         </KeyboardAvoidingView>
