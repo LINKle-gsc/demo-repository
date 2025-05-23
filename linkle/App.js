@@ -1,22 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Text, View, Platform, Alert } from 'react-native';
-import { StatusBar } from 'expo-status-bar';
+import React, { useState, useEffect } from 'react';
+import { Alert } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { enableScreens } from 'react-native-screens';
 import * as Contacts from 'expo-contacts';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SplashScreen from 'expo-splash-screen'; // SplashScreen import 주석 해제
+import * as SplashScreen from 'expo-splash-screen';
 
 // 화면 구성용 컴포넌트
 import QuestionScreen from './screens/QuestionScreen';
-import HomeScreen from './screens/HomeScreen';
-// import ResultScreen from './screens/ResultScreen'; // 기존 ResultScreen 주석 처리 또는 삭제
 import SavedTargetsScreen from './screens/SavedTargetsScreen';
 import DeviceContactsScreen from './screens/DeviceContactsScreen';
-import OnboardingScreen from './screens/OnboardingScreen'; // OnboardingScreen import 추가
-import TopicResultScreen from './screens/TopicResultScreen'; // TopicResultScreen import 추가
-import MessageResultScreen from './screens/MessageResultScreen'; // MessageResultScreen import 추가
+import OnboardingScreen from './screens/OnboardingScreen';
+import TopicResultScreen from './screens/TopicResultScreen';
+import MessageResultScreen from './screens/MessageResultScreen';
 
 // 네이티브 스크린 최적화
 enableScreens();
@@ -26,11 +23,7 @@ const Stack = createNativeStackNavigator();
 
 // 연락처 관련 상수
 const SAVED_TARGET_CONTACTS_KEY = '@randomCallTargetContacts';
-const ONBOARDING_COMPLETED_KEY = '@onboardingCompleted'; // 온보딩 완료 키
-const VIEW_TYPES = {
-  SAVED_TARGETS: 'SAVED_TARGETS',
-  DEVICE_CONTACTS: 'DEVICE_CONTACTS',
-};
+const ONBOARDING_COMPLETED_KEY = '@onboardingCompleted';
 
 // 스플래시 화면이 자동으로 숨겨지는 것을 방지
 SplashScreen.preventAutoHideAsync(); // 주석 해제
@@ -56,17 +49,15 @@ export default function App() {
           setShowOnboarding(false);
           console.log("Onboarding completed, setShowOnboarding(false)");
         }
-        
+
         await loadSavedTargetContacts();
         await requestInitialPermission();
-        
+
         console.log("Initial data loading complete.");
 
       } catch (e) {
         console.warn("Error during app preparation:", e);
-        // 실제 앱에서는 여기서 에러 처리를 좀 더 견고하게 할 수 있습니다.
-        // 예를 들어, 온보딩 상태 로드 실패 시 기본적으로 온보딩을 보여주도록 할 수 있습니다.
-        setShowOnboarding(true); // 에러 발생 시 안전하게 온보딩 표시
+        setShowOnboarding(true);
       } finally {
         setAppIsReady(true);
         console.log("App is ready, setting appIsReady to true.");
@@ -106,7 +97,6 @@ export default function App() {
       console.log("Loaded saved target contacts:", saved.length);
     } catch (e) {
       console.error("Failed to load target contacts from AsyncStorage", e);
-      // Alert.alert("Error", "Failed to load previously saved target contacts."); // 앱 초기 로딩 시 과도한 알림 방지
     }
   };
 
@@ -167,7 +157,7 @@ export default function App() {
       Alert.alert("Error", "Failed to update target contacts.");
     }
   };
-  
+
   const removeTargetContact = async (contactIdToRemove) => {
     const newTargetContacts = targetContacts.filter(contact => contact.id !== contactIdToRemove);
     try {
@@ -224,33 +214,27 @@ export default function App() {
   return (
     <NavigationContainer>
       <Stack.Navigator initialRouteName="SavedTargets">
-        {/* HomeScreen은 현재 사용되지 않는 것으로 보이므로 필요시 주석 해제 또는 제거 */}
-        {/* <Stack.Screen 
-          name="Home" 
-          component={HomeScreen} 
-          options={{ title: '홈' }}
-        /> */}
-        <Stack.Screen 
-          name="Questions" 
-          component={QuestionScreen} 
+        <Stack.Screen
+          name="Questions"
+          component={QuestionScreen}
           options={{ title: 'Revisit Memories' }}
         />
-        <Stack.Screen 
+        <Stack.Screen
           name="TopicResult"
           component={TopicResultScreen}
           options={{ headerShown: false }}
         />
-        <Stack.Screen 
+        <Stack.Screen
           name="MessageResult"
           component={MessageResultScreen}
           options={{ headerShown: false }}
         />
-        <Stack.Screen 
+        <Stack.Screen
           name="SavedTargets"
           options={{ headerShown: false }}
         >
           {({ navigation }) => (
-            <SavedTargetsScreen 
+            <SavedTargetsScreen
               targetContacts={targetContacts}
               onManageTargets={() => handlePlusButtonPress(navigation)}
               onRemoveTarget={removeTargetContact}
@@ -258,13 +242,13 @@ export default function App() {
             />
           )}
         </Stack.Screen>
-        <Stack.Screen 
+        <Stack.Screen
           name="DeviceContacts"
           options={{ headerShown: false }}
         >
           {({ navigation }) => (
             <DeviceContactsScreen
-              contacts={contacts} 
+              contacts={contacts}
               selectedContacts={selectedContacts}
               onToggleContact={toggleContactSelectionInDeviceScreen}
               onSaveChanges={() => {
