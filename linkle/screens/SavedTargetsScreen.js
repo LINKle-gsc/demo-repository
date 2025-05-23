@@ -73,69 +73,51 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
   };
 
   /**
-   * 연락처 삭제 확인 다이얼로그 표시
-   * @param {Object} item - 삭제할 연락처 객체
-   * @param {string} item.name - 연락처 이름
-   * @param {string} item.id - 연락처 ID
-   * @description 삭제 확인 알림을 표시하고 사용자 확인 시 onRemoveTarget 콜백 호출
-   */
-  const confirmDelete = (item) => {
-    Alert.alert(
-      "Confirm Delete",
-      `Are you sure you want to delete '${item.name}'?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "OK", onPress: () => onRemoveTarget(item.id) }
-      ],
-      { cancelable: false }
-    );
-  };
-
-  /**
    * 랜덤 연락처 선택 및 Linkle 시작
-   * @description 저장된 연락처 중 랜덤하게 선택하여 확인 후 Questions 화면으로 이동
-   * 선택된 연락처는 하이라이트 표시되며, 로딩 상태를 2초간 표시
+   * @description 3초간 로딩 UI를 표시한 후 저장된 연락처 중 랜덤하게 선택하여 확인 후 Questions 화면으로 이동
+   * 선택된 연락처는 하이라이트 표시되며, 로딩 상태를 표시
    */
   const handleRandomSelect = () => {
     if (targetContacts && targetContacts.length > 0) {
-      const randomIndex = Math.floor(Math.random() * targetContacts.length);
-      const selectedContact = targetContacts[randomIndex];
+      // 즉시 로딩 시작
+      setIsLinking(true);
 
-      if (selectedContact) {
-        Alert.alert(
-          "Confirm Selection",
-          `'${selectedContact.name}'님과 Linkle 하시겠습니까?`,
-          [
-            {
-              text: "취소",
-              style: "cancel",
-              onPress: () => {
-                // 이전 하이라이트 초기화 (선택 취소 시)
-                setHighlightedContactId(null);
-              }
-            },
-            {
-              text: "Linkle 시작",
-              onPress: () => {
-                setIsLinking(true);
-                // 이전 하이라이트 초기화 (새로운 선택 시)
-                // setHighlightedContactId(null); // 원한다면 여기에 추가하여 매번 초기화 가능
+      // 3초 후에 랜덤 선택 실행
+      setTimeout(() => {
+        const randomIndex = Math.floor(Math.random() * targetContacts.length);
+        const selectedContact = targetContacts[randomIndex];
 
-                setTimeout(() => {
-                  if (selectedContact) { // setTimeout 내부에서도 selectedContact가 유효한지 확인
-                    setHighlightedContactId(selectedContact.id); // 선택된 연락처 ID 설정
+        // 로딩 종료
+        setIsLinking(false);
+
+        if (selectedContact) {
+          Alert.alert(
+            "Confirm Selection",
+            `'${selectedContact.name}'님과 Linkle 하시겠습니까?`,
+            [
+              {
+                text: "취소",
+                style: "cancel",
+                onPress: () => {
+                  setHighlightedContactId(null);
+                }
+              },
+              {
+                text: "Linkle 시작",
+                onPress: () => {
+                  if (selectedContact) {
+                    setHighlightedContactId(selectedContact.id);
                   }
                   if (navigation && selectedContact) {
                     navigation.navigate('Questions', { name: selectedContact.name });
                   }
-                  setIsLinking(false);
-                }, 2000);
+                }
               }
-            }
-          ],
-          { cancelable: true, onDismiss: () => setHighlightedContactId(null) } // Alert 외부를 탭하여 닫을 때도 하이라이트 초기화
-        );
-      }
+            ],
+            { cancelable: true, onDismiss: () => setHighlightedContactId(null) }
+          );
+        }
+      }, 3000); // 3초 대기
     } else {
       Alert.alert("No Targets", "No targets are saved, so a random selection cannot be made.");
     }
@@ -147,16 +129,13 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
    * @param {Object} data.item - 연락처 정보
    * @param {Object} rowMap - SwipeListView 행 맵 객체
    * @returns {JSX.Element} 연락처 아이템 컴포넌트
-   * @description 연락처 이름, 전화번호, 채팅 버튼 및 하이라이트 체크 아이콘을 포함한 UI 렌더링
+   * @description 연락처 이름, 전화번호, 채팅 버튼을 포함한 UI 렌더링
    */
   const renderItem = (data, rowMap) => (
     <View style={styles.contactItemFront}>
       <View style={styles.contactInfoWrapper}>
         <View style={styles.contactNameContainer}>
           <Text style={styles.contactName} numberOfLines={1} ellipsizeMode="tail">{data.item.name}</Text>
-          {data.item.id === highlightedContactId && (
-            <Icon name="checkmark-circle-outline" size={22} color="#4CAF50" style={styles.checkIcon} />
-          )}
         </View>
         {data.item.phoneNumbers && data.item.phoneNumbers[0] && (
           <Text style={styles.contactPhone} numberOfLines={1} ellipsizeMode="tail">{data.item.phoneNumbers[0].number}</Text>
@@ -185,6 +164,25 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
       </TouchableOpacity>
     </View>
   );
+
+  /**
+   * 연락처 삭제 확인 다이얼로그 표시
+   * @param {Object} item - 삭제할 연락처 객체
+   * @param {string} item.name - 연락처 이름
+   * @param {string} item.id - 연락처 ID
+   * @description 삭제 확인 알림을 표시하고 사용자 확인 시 onRemoveTarget 콜백 호출
+   */
+  const confirmDelete = (item) => {
+    Alert.alert(
+      "Confirm Delete",
+      `Are you sure you want to delete '${item.name}'?`,
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "OK", onPress: () => onRemoveTarget(item.id) }
+      ],
+      { cancelable: false }
+    );
+  };
 
   /**
    * 빈 리스트 상태 컴포넌트 렌더링
@@ -248,7 +246,7 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
       >
         <View style={styles.lottieOverlay}>
           <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.lottieText}>Linkle하는중...</Text>
+          <Text style={styles.lottieText}>랜덤 선택 중...</Text>
         </View>
       </Modal>
     </SafeAreaView>
@@ -285,7 +283,7 @@ const styles = StyleSheet.create({
   },
   list: {
     flexGrow: 1,
-    backgroundColor: '#FFFCF4', // Ensure list background is also beige
+    backgroundColor: '#FFFCF4',
   },
   contactItemFront: {
     flexDirection: 'row',
@@ -309,7 +307,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
-  contactNameContainer: { // 이름과 체크 아이콘을 위한 컨테이너
+  contactNameContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -319,9 +317,6 @@ const styles = StyleSheet.create({
     marginBottom: 2,
     color: '#4A4031',
   },
-  checkIcon: { // 체크 아이콘 스타일
-    marginLeft: 8,
-  },
   contactPhone: {
     fontSize: 13,
     color: '#7A705F',
@@ -330,7 +325,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
   },
-  emptyContainer: { // Container for empty state content
+  emptyContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
@@ -340,12 +335,12 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     color: '#7A705F',
-    marginBottom: 30, // 텍스트와 이미지 사이 간격
-    lineHeight: 24, // Add line height for better readability
+    marginBottom: 30,
+    lineHeight: 24,
   },
   emptyStateImage: {
-    width: width * 0.6, // Adjust width as needed
-    height: width * 0.6 * (3 / 4), // Assuming a 4:3 aspect ratio, adjust as needed
+    width: width * 0.6,
+    height: width * 0.6 * (3 / 4), // TODO: Assuming a 4:3 aspect ratio, adjust as needed
     resizeMode: 'contain',
   },
   chatIconButton: {

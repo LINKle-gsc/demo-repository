@@ -151,7 +151,6 @@ export default function App() {
       await AsyncStorage.setItem(SAVED_TARGET_CONTACTS_KEY, jsonValue);
       setTargetContacts(newTargetContacts);
       console.log('Target contacts updated in AsyncStorage:', newTargetContacts.length);
-      Alert.alert("Targets Updated", `Successfully updated ${newTargetContacts.length} call targets!`);
     } catch (e) {
       console.error("Failed to save target contacts to AsyncStorage", e);
       Alert.alert("Error", "Failed to update target contacts.");
@@ -164,7 +163,6 @@ export default function App() {
       const jsonValue = JSON.stringify(newTargetContacts);
       await AsyncStorage.setItem(SAVED_TARGET_CONTACTS_KEY, jsonValue);
       setTargetContacts(newTargetContacts);
-      Alert.alert("Target Removed", "Contact removed from call targets.");
     } catch (e) {
       console.error("Failed to remove target contact from AsyncStorage", e);
       Alert.alert("Error", "Failed to remove target contact.");
