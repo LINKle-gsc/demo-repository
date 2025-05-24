@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Text, View, TextInput, Button, Alert, ActivityIndicator, Share, TouchableOpacity, ScrollView, StyleSheet as RNStyleSheet, FlatList, KeyboardAvoidingView, Platform } from 'react-native';
+import React, { useState } from 'react';
+import { Text, View, TextInput, Button, Share, TouchableOpacity, ScrollView, StyleSheet as RNStyleSheet, FlatList, KeyboardAvoidingView, Platform, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { requestGeminiSuggestions, requestRefinedQuestion, requestConversationSummary } from '../api/QuestionApi';
-import { styles as commonStylesFromQuestionStyles } from '../styles/QuestionStyles'; // 기존 스타일 임포트 이름 변경
-import Constants from 'expo-constants'; // For status bar height
+import { styles as commonStylesFromQuestionStyles } from '../styles/QuestionStyles';
+import { useChat, useQuestions, useCompletion } from '../hooks';
+import Constants from 'expo-constants';
 
 const TOTAL_QUESTIONS = 5;
 const FIRST_QUESTION = "When did you first get to know {name}?"
@@ -19,24 +19,15 @@ const BASE_QUESTIONS_TEMPLATES = [
 // API에 전달할 질문 개선 지침
 const REFINEMENT_PROMPT_VARIABLE = `Based on the user's previous answer, please refine the upcoming base question to make the conversation with user's friend ({name}) more personal and in-depth, while keeping the core intent of the base question. The refined question must include {name}'s name. Please keep it concise and use a friendly tone. Keep in mind that you are talking to the user, NOT to {name}. Do NOT start conversation with user's friend name ({name}).`;
 
-// 질문 입력 컴포넌트 분리
-function QuestionInput({ question, value, onChange, placeholder, disabled }) {
-  return (
-    <>
-      <Text style={commonStylesFromQuestionStyles.question}>{question}</Text>
-      <TextInput
-        style={commonStylesFromQuestionStyles.input}
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor="#aaa"
-        editable={!disabled}
-      />
-    </>
-  );
-}
-
-// 결과 리스트 컴포넌트 분리
+/**
+ * 결과 리스트를 렌더링하는 컴포넌트
+ * @param {Object} props - 컴포넌트 props
+ * @param {string} props.title - 리스트 제목
+ * @param {string[]} props.items - 표시할 아이템 배열
+ * @param {number[]} props.selected - 선택된 아이템의 인덱스 배열
+ * @param {Function} props.onSelect - 아이템 선택 시 호출되는 콜백 함수
+ * @returns {JSX.Element} 결과 리스트 컴포넌트
+ */
 function ResultList({ title, items, selected, onSelect }) {
   return (
     <>
@@ -52,212 +43,109 @@ function ResultList({ title, items, selected, onSelect }) {
   );
 }
 
-// 커스텀 버튼 컴포넌트
-function CustomButton({ title, onPress, disabled, style, textStyle }) {
-  return (
-    <TouchableOpacity
-      style={[customButtonStyles.button, style, disabled && customButtonStyles.disabledButton]}
-      onPress={onPress}
-      disabled={disabled}
-      activeOpacity={0.7}
-    >
-      <Text style={[customButtonStyles.buttonText, textStyle, disabled && customButtonStyles.disabledButtonText]}>
-        {title}
-      </Text>
-    </TouchableOpacity>
-  );
-}
-
+/**
+ * 질문-답변 화면을 구성하는 메인 컴포넌트
+ * 사용자와의 대화형 질문을 통해 친구와의 관계 정보를 수집하고,
+ * AI를 통해 대화 주제와 시작 문구를 생성합니다.
+ * 
+ * @param {Object} props - 컴포넌트 props
+ * @param {Object} props.navigation - React Navigation의 navigation 객체
+ * @param {Object} props.route - 라우트 매개변수를 포함한 route 객체
+ * @param {string} props.route.params.name - 대화 상대방의 이름
+ * @returns {JSX.Element} 질문 화면 컴포넌트
+ * 
+ * @example
+ * // 네비게이션에서 사용
+ * navigation.navigate('Questions', { name: '김민수' });
+ */
 export default function QuestionScreen({ navigation, route }) {
   const name = route?.params?.name || '';
-  const [activeQuestionIndex, setActiveQuestionIndex] = useState(0); // 현재 몇 번째 *질문 사이클*인지 (0-4)
-  const [chatMessages, setChatMessages] = useState([]);
-  const [currentInputValue, setCurrentInputValue] = useState('');
-  // 로딩 상태 분리
-  const [isLoadingNextQuestion, setIsLoadingNextQuestion] = useState(false);
-  const [isLoadingCompletion, setIsLoadingCompletion] = useState(false);
+
+  // 커스텀 훅들 사용
+  const {
+    chatMessages,
+    addMessage,
+    resetChat,
+    flatListRef
+  } = useChat(name, FIRST_QUESTION);
+
+  const {
+    activeQuestionIndex,
+    currentInputValue,
+    setCurrentInputValue,
+    isLoadingNextQuestion,
+    setFirstQuestion,
+    resetQuestionState,
+    handleAnswerAndGenerateNext,
+    isAllQuestionsCompleted
+  } = useQuestions(name, TOTAL_QUESTIONS, BASE_QUESTIONS_TEMPLATES, REFINEMENT_PROMPT_VARIABLE);
+
+  const {
+    isLoadingCompletion,
+    handleComplete: handleCompletionProcess
+  } = useCompletion(name, TOTAL_QUESTIONS);
+
+  // 결과 화면용 상태들
   const [stage, setStage] = useState('questions');
   const [starters, setStarters] = useState([]);
   const [topics, setTopics] = useState([]);
   const [selectedStarters, setSelectedStarters] = useState([]);
   const [selectedTopics, setSelectedTopics] = useState([]);
   const [resultText, setResultText] = useState('');
-  const flatListRef = useRef(null);
 
-  // 첫 번째 질문과 답변을 저장하기 위한 상태
-  const [firstQuestionActualText, setFirstQuestionActualText] = useState('');
-  const [firstAnswerActualText, setFirstAnswerActualText] = useState('');
-
-  // 네비게이션 헤더 높이 (대략적인 값, 실제 앱에 맞게 조절 필요)
-  // StackNavigator의 기본 헤더를 사용하고 있다면 그 높이를 고려해야 합니다.
-  // 현재 QuestionScreen은 App.js에서 options={{ title: '질문하기' }}로 기본 헤더를 사용 중입니다.
-  // expo-constants statusBarHeight는 상태표시줄 높이이므로, 네비게이션 헤더 높이는 별도 계산 또는 고정값 사용.
-  // React Navigation의 기본 헤더 높이는 플랫폼과 버전에 따라 다를 수 있으나, 대략 56(Android) ~ 44+StatusBar(iOS)dp.
-  // 여기서는 iOS의 경우 Status Bar + Nav Bar를 합쳐서 대략적인 값을 줍니다.
+  // 네비게이션 헤더 높이 계산
   const headerHeight = Platform.OS === 'ios' ? 44 + Constants.statusBarHeight : Constants.statusBarHeight + 56;
 
-  useEffect(() => {
+  // 이름이 변경될 때 상태 초기화
+  React.useEffect(() => {
     if (name) {
-      setChatMessages([]);
-      setActiveQuestionIndex(0);
-      const initialQuestionText = FIRST_QUESTION.replaceAll('{name}', name);
-      setFirstQuestionActualText(initialQuestionText); // 첫 번째 질문 실제 텍스트 저장
-      setFirstAnswerActualText(''); // 이름 변경 시 첫 번째 답변 초기화
-      setChatMessages([{ id: 'q0', type: 'question', text: initialQuestionText }]);
-      // ResultList 관련 상태 초기화 (필요시)
+      const initialQuestionText = resetChat();
+      setFirstQuestion(initialQuestionText);
+      resetQuestionState();
       setStarters([]);
       setTopics([]);
       setSelectedStarters([]);
       setSelectedTopics([]);
       setResultText('');
-      setStage('questions'); // stage도 초기화
+      setStage('questions');
     }
-  }, [name]);
+  }, [name, resetChat, setFirstQuestion, resetQuestionState]);
 
-  useEffect(() => {
-    if (flatListRef.current) {
-      flatListRef.current.scrollToEnd({ animated: true });
-    }
-  }, [chatMessages]);
-
+  /**
+   * 사용자가 답변을 전송할 때 호출되는 함수
+   * 커스텀 훅의 handleAnswerAndGenerateNext 함수를 사용합니다.
+   */
   const handleSendMessage = async () => {
-    if (currentInputValue.trim() === '') return;
-
-    const userAnswer = currentInputValue.trim();
     const currentQuestionMessage = chatMessages.filter(msg => msg.type === 'question').slice(-1)[0];
-    const immediatePreviousQuestionText = currentQuestionMessage?.text || "";
+    const currentQuestionText = currentQuestionMessage?.text || "";
 
-    const newAnswer = {
-      id: 'a' + activeQuestionIndex,
-      type: 'answer',
-      text: userAnswer
-    };
-
-    // 첫 번째 질문에 대한 답변인 경우 저장
-    if (activeQuestionIndex === 0) {
-      setFirstAnswerActualText(userAnswer);
-    }
-
-    setChatMessages(prevMessages => [...prevMessages, newAnswer]);
-    setCurrentInputValue('');
-
-    const nextQuestionCycleIndex = activeQuestionIndex + 1; // 다음에 진행할 질문 사이클 (1-5)
-
-    if (nextQuestionCycleIndex < TOTAL_QUESTIONS) {
-      setIsLoadingNextQuestion(true); // 다음 질문 로딩 시작
-      try {
-        // nextQuestionCycleIndex는 1, 2, 3, 4가 될 수 있음.
-        // BASE_QUESTIONS_TEMPLATES의 인덱스는 0, 1, 2, 3이 됨.
-        const baseQuestionTemplateIndex = nextQuestionCycleIndex - 1;
-
-        // 배열 범위 확인 추가
-        if (baseQuestionTemplateIndex < BASE_QUESTIONS_TEMPLATES.length) {
-          const baseQuestionToRefine = BASE_QUESTIONS_TEMPLATES[baseQuestionTemplateIndex].replaceAll('{name}', name);
-
-          // API에 전달할 첫 번째 질문/답변 (Q3부터 유효)
-          const q1TextForApi = activeQuestionIndex >= 1 ? firstQuestionActualText : null;
-          const a1TextForApi = activeQuestionIndex >= 1 ? firstAnswerActualText : null;
-
-          const response = await requestRefinedQuestion(
-            name,
-            baseQuestionToRefine,
-            immediatePreviousQuestionText, // 바로 이전 질문
-            userAnswer,                 // 바로 이전 답변 (현재 제출된 답변)
-            REFINEMENT_PROMPT_VARIABLE,
-            q1TextForApi,                // 첫 번째 질문 텍스트 (Q3부터 전달)
-            a1TextForApi                 // 첫 번째 답변 텍스트 (Q3부터 전달)
-          );
-
-          if (response.ok && response.refinedQuestion) {
-            setChatMessages(prevMessages => [...prevMessages, {
-              id: 'q' + nextQuestionCycleIndex,
-              type: 'question',
-              text: response.refinedQuestion // API가 {name}을 이미 처리했다고 가정, 필요시 .replaceAll('{name}', name)
-            }]);
-            setActiveQuestionIndex(nextQuestionCycleIndex);
-          } else {
-            Alert.alert('다음 질문 생성 실패', response.reason || '다음 질문을 받아오는데 실패했습니다. 기본 질문으로 표시합니다.');
-            // API 실패 시, 기본 템플릿 질문이라도 보여주기
-            setChatMessages(prevMessages => [...prevMessages, {
-              id: 'q' + nextQuestionCycleIndex,
-              type: 'question',
-              text: baseQuestionToRefine // 기본 템플릿 사용
-            }]);
-            setActiveQuestionIndex(nextQuestionCycleIndex);
-          }
-        } else {
-          // 이 경우는 발생하지 않아야 하지만, 안전장치로 추가
-          console.error("BASE_QUESTIONS_TEMPLATES 인덱스 오류", baseQuestionTemplateIndex);
-          Alert.alert("오류", "질문 목록 구성에 문제가 있습니다.");
-          setIsLoadingNextQuestion(false); // 로딩 중단
-          return; // 함수 종료
-        }
-      } catch (error) {
-        Alert.alert('질문 생성 오류', '다음 질문을 생성하는 중 오류가 발생했습니다. 기본 질문으로 표시합니다.');
-        console.error("Error fetching refined question:", error);
-        // 오류 발생 시에도 기본 질문 템플릿을 사용하려고 시도 (인덱스 확인 필요)
-        const baseQuestionTemplateIndexOnError = nextQuestionCycleIndex - 1;
-        if (baseQuestionTemplateIndexOnError < BASE_QUESTIONS_TEMPLATES.length) {
-          const baseQuestionToRefineOnError = BASE_QUESTIONS_TEMPLATES[baseQuestionTemplateIndexOnError].replaceAll('{name}', name);
-          setChatMessages(prevMessages => [...prevMessages, {
-            id: 'q' + nextQuestionCycleIndex,
-            type: 'question',
-            text: baseQuestionToRefineOnError
-          }]);
-          setActiveQuestionIndex(nextQuestionCycleIndex);
-        } else {
-          console.error("Catch - BASE_QUESTIONS_TEMPLATES 인덱스 오류", baseQuestionTemplateIndexOnError);
-          Alert.alert("오류", "질문 목록 구성에 문제가 있어 다음 질문을 표시할 수 없습니다.");
-        }
-      }
-      setIsLoadingNextQuestion(false); // 다음 질문 로딩 종료
-    } else {
-      setActiveQuestionIndex(nextQuestionCycleIndex); // 모든 질문 완료 (TOTAL_QUESTIONS 도달)
-      // 이제 handleComplete를 누를 수 있게 됨
-    }
+    await handleAnswerAndGenerateNext(currentInputValue, currentQuestionText, addMessage);
   };
 
+  /**
+   * 모든 질문 완료 후 결과 생성을 처리하는 함수
+   * 커스텀 훅의 handleComplete 함수를 사용합니다.
+   */
   const handleComplete = async () => {
-    setIsLoadingCompletion(true); // 완료 API 호출 로딩 시작
-    const collectedAnswers = chatMessages
-      .filter(msg => msg.type === 'answer')
-      .map(msg => msg.text);
-
-    if (collectedAnswers.length !== TOTAL_QUESTIONS) {
-      Alert.alert("답변 미완료", `모든 질문(${TOTAL_QUESTIONS}개)에 답변해주세요.`);
-      setIsLoadingCompletion(false);
-      return;
-    }
-
-    // 두 API 호출을 병렬 또는 순차적으로 실행
-    try {
-      // 1. 대화 요약 요청
-      const summaryResponse = await requestConversationSummary(name, chatMessages);
-      const conversationSummary = summaryResponse.ok ? summaryResponse.summary : "Could not retrieve conversation summary.";
-
-      // 2. 대화 주제 및 스타터 요청
-      const suggestionsResult = await requestGeminiSuggestions({ answers: collectedAnswers, name });
-
-      setIsLoadingCompletion(false); // 모든 API 호출 후 로딩 종료
-
-      if (suggestionsResult.ok) {
-        navigation.navigate('TopicResult', {
-          starters: suggestionsResult.starters,
-          topics: suggestionsResult.topics,
-          rawText: suggestionsResult.rawText, // requestGeminiSuggestions의 rawText도 전달
-          name,
-          conversationSummary: conversationSummary // 생성된 요약 전달
-        });
-      } else {
-        Alert.alert('Linkle 생성 실패', suggestionsResult.reason || '결과를 가져오는데 실패했습니다.');
-      }
-    } catch (error) {
-      setIsLoadingCompletion(false);
-      console.error("Error during completion process:", error);
-      Alert.alert('오류 발생', '결과를 처리하는 중 문제가 발생했습니다.');
-    }
+    await handleCompletionProcess(chatMessages, navigation);
   };
 
+  /**
+   * FlatList에서 각 채팅 메시지를 렌더링하는 함수
+   * 질문과 답변을 구분하여 다른 스타일로 표시합니다.
+   * 
+   * @function renderChatItem
+   * @param {Object} params - FlatList renderItem 매개변수
+   * @param {Object} params.item - 렌더링할 메시지 객체
+   * @param {string} params.item.id - 메시지 고유 ID
+   * @param {'question'|'answer'} params.item.type - 메시지 타입
+   * @param {string} params.item.text - 메시지 내용
+   * @returns {JSX.Element} 렌더링된 채팅 메시지 컴포넌트
+   * 
+   * 스타일 적용:
+   * - 질문: 왼쪽 정렬, 연한 배경색
+   * - 답변: 오른쪽 정렬, 테두리가 있는 흰색 배경
+   */
   const renderChatItem = ({ item }) => {
     const messageStyle = item.type === 'question' ? styles.questionBubble : styles.answerBubble;
     const textStyle = item.type === 'question' ? styles.questionText : styles.answerText;
@@ -272,7 +160,7 @@ export default function QuestionScreen({ navigation, route }) {
     );
   };
 
-  const allQuestionsAnswered = activeQuestionIndex >= TOTAL_QUESTIONS;
+  const allQuestionsAnswered = isAllQuestionsCompleted();
   const isLoading = isLoadingNextQuestion || isLoadingCompletion; // 통합 로딩 상태
 
   if (stage === 'questions') {
@@ -370,7 +258,19 @@ export default function QuestionScreen({ navigation, route }) {
   );
 }
 
-// DeviceContactsScreen.js의 디자인을 적용한 새로운 스타일
+/**
+ * 스타일 상수
+ * QuestionScreen 컴포넌트에서 사용하는 모든 스타일을 정의합니다.
+ * 
+ * 주요 스타일:
+ * - safeArea: 안전 영역 설정
+ * - chatListContainer: 채팅 리스트 컨테이너
+ * - messageBubble: 메시지 말풍선 기본 스타일
+ * - questionBubble: 질문 말풍선 스타일
+ * - answerBubble: 답변 말풍선 스타일
+ * - inputContainer: 입력 영역 컨테이너
+ * - loadingOverlay: 로딩 오버레이
+ */
 const styles = RNStyleSheet.create({
   safeArea: {
     flex: 1,
@@ -483,11 +383,3 @@ const styles = RNStyleSheet.create({
     textAlign: 'center',
   },
 });
-
-// CustomButton 컴포넌트는 QuestionScreen 내부에서 TouchableOpacity로 대체되었으므로 제거 가능
-// 또는 필요 시 스타일만 참고
-/*
-const customButtonStyles = RNStyleSheet.create({
-  // ... (이전 customButtonStyles 내용) ...
-});
-*/ 
