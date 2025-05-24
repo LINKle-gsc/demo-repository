@@ -5,118 +5,6 @@ const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/
 const REQUEST_TIMEOUT_MS = 10000;
 
 /**
- * Gemini API에 대화 추천을 요청하고, 파싱된 리스트를 반환합니다.
- * @param {Object} params
- * @param {string[]} params.answers - 사용자의 답변 배열
- * @param {string} params.name - 친구 이름
- * @returns {Promise<{ok: true, starters: string[], topics: string[], rawText: string} | {ok: false, reason: string}>}
- */
-export async function requestGeminiSuggestions({ answers, name }) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-
-  // 시스템 프롬프트를 영어 중심으로 수정하고, 최종 결과물(스타터, 토픽) 영어로 명시
-  const systemPrompt = `You are an expert conversation facilitator helping a user start a meaningful chat with their friend, ${name}.
-Based on the user's answers below about their relationship with ${name}, please recommend 3-5 conversation starters and 3-5 interesting topics.
-
-**Output Format (Crucial):**
-- Clearly distinguish between the user and the friend named ${name}.
-- Never refer to the user as ${name} under any circumstances.
-- Provide ONLY two lists: one for starters and one for topics.
-- Each list item MUST begin with a hyphen ('-').
-- Do NOT include any extra explanations, numbering, or other text.
-- If ${name}'s name should be in a starter or topic, use the actual name "${name}" instead of a placeholder.
-- **All conversation starters and topics MUST be in English.**
-
-[Conversation Starters]
-- (Starter 1 in English)
-- (Starter 2 in English)
-- (Starter 3 in English)
-...
-
-[Conversation Topics]
-- (Topic 1 in English)
-- (Topic 2 in English)
-- (Topic 3 in English)
-...
-
-User's answers regarding ${name}:
-${answers.map((a, i) => `Q${i + 1}: ${a}`).join('\n')}`;
-
-  const url = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
-
-  try {
-    // const prompt = `${systemPrompt}\n\n${promptText}`; // promptText는 이미 systemPrompt에 통합됨
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: 'user',
-            parts: [{ text: systemPrompt }], // 수정된 systemPrompt 사용
-          },
-        ],
-        // generationConfig: { responseMimeType: "application/json" } // 이 API는 특정 JSON 구조를 강제하지 않음
-      }),
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      return {
-        ok: false,
-        reason: `Gemini API 오류 (Suggestions): ${response.status} ${response.statusText} - ${errorText}`,
-      };
-    }
-    const data = await response.json();
-    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '[No response text]';
-
-    const starters = [];
-    const topics = [];
-    let currentSection = null; // 변수명 변경 (section -> currentSection)
-    rawText.split('\n').forEach(line => {
-      const trimmed = line.trim();
-      if (trimmed.toLowerCase().startsWith('[conversation starters]')) { // 소문자 비교 추가
-        currentSection = 'starters';
-        return;
-      }
-      if (trimmed.toLowerCase().startsWith('[conversation topics]')) { // 소문자 비교 추가
-        currentSection = 'topics';
-        return;
-      }
-      if (trimmed.startsWith('-')) {
-        const itemText = trimmed.replace(/^-\s*/, '');
-        if (itemText) { // 빈 항목 추가 방지
-          if (currentSection === 'starters') starters.push(itemText);
-          else if (currentSection === 'topics') topics.push(itemText);
-        }
-      }
-    });
-
-    // 만약 starters나 topics가 비어있다면, rawText에서 파싱이 제대로 안된 것일 수 있음.
-    // 이 경우, 사용자에게 rawText라도 보여주거나, 다른 fallback 처리 고려.
-    if (starters.length === 0 && topics.length === 0 && rawText !== '[No response text]') {
-      console.warn("Could not parse starters/topics, but rawText is available:", rawText);
-      // 예시: topics에 rawText의 일부를 넣어주거나, 특정 메시지 전달
-      // topics.push("Could not parse specific topics, please refer to the raw response if needed.");
-    }
-
-    return { ok: true, starters, topics, rawText };
-  } catch (error) {
-    clearTimeout(timeoutId);
-    return { ok: false, reason: error.message || 'Network error or unknown error during suggestions generation' };
-  }
-}
-
-// requestInitialQuestions 및 requestNextQuestion 함수는 이제 사용되지 않으므로 제거하거나 주석 처리합니다.
-/*
-export async function requestInitialQuestions(name) { ... }
-export async function requestNextQuestion(name, previousQuestion, previousAnswer) { ... }
-*/
-
-/**
  * Gemini API에 이전 대화 내용과 기본 질문, 그리고 개선 지침을 전달하여
  * 맥락에 맞게 개선된 다음 질문 하나를 받아옵니다.
  * @param {string} name - 친구 이름
@@ -141,7 +29,6 @@ First answer: ${firstAnswerText}
 `;
   }
 
-  // 시스템 프롬프트를 영어 중심으로 수정, 최종 질문 영어로 명시
   const systemPrompt = `You are an AI conversation designer tasked with making a user's chat with their friend (${name}) more natural and meaningful.
 
 User's friend's name: "${name}"
@@ -227,6 +114,105 @@ Example (the actual content will vary greatly based on input, but the response m
 }
 
 /**
+ * Gemini API에 대화 추천을 요청하고, 파싱된 리스트를 반환합니다.
+ * @param {Object} params
+ * @param {string[]} params.answers - 사용자의 답변 배열
+ * @param {string} params.name - 친구 이름
+ * @returns {Promise<{ok: true, starters: string[], topics: string[], rawText: string} | {ok: false, reason: string}>}
+ */
+export async function requestGeminiSuggestions({ answers, name }) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  const systemPrompt = `You are an expert conversation facilitator helping a user start a meaningful chat with their friend, ${name}.
+Based on the user's answers below about their relationship with ${name}, please recommend 3-5 conversation starters and 3-5 interesting topics.
+
+**Output Format (Crucial):**
+- Clearly distinguish between the user and the friend named ${name}.
+- Never refer to the user as ${name} under any circumstances.
+- Provide ONLY two lists: one for starters and one for topics.
+- Each list item MUST begin with a hyphen ('-').
+- Do NOT include any extra explanations, numbering, or other text.
+- If ${name}'s name should be in a starter or topic, use the actual name "${name}" instead of a placeholder.
+- **All conversation starters and topics MUST be in English.**
+
+[Conversation Starters]
+- (Starter 1 in English)
+- (Starter 2 in English)
+- (Starter 3 in English)
+...
+
+[Conversation Topics]
+- (Topic 1 in English)
+- (Topic 2 in English)
+- (Topic 3 in English)
+...
+
+User's answers regarding ${name}:
+${answers.map((a, i) => `Q${i + 1}: ${a}`).join('\n')}`;
+
+  const url = `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`;
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [
+          {
+            role: 'user',
+            parts: [{ text: systemPrompt }],
+          },
+        ],
+      }),
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return {
+        ok: false,
+        reason: `Gemini API 오류 (Suggestions): ${response.status} ${response.statusText} - ${errorText}`,
+      };
+    }
+    const data = await response.json();
+    const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text ?? '[No response text]';
+
+    const starters = [];
+    const topics = [];
+    let currentSection = null;
+    rawText.split('\n').forEach(line => {
+      const trimmed = line.trim();
+      if (trimmed.toLowerCase().startsWith('[conversation starters]')) {
+        currentSection = 'starters';
+        return;
+      }
+      if (trimmed.toLowerCase().startsWith('[conversation topics]')) {
+        currentSection = 'topics';
+        return;
+      }
+      if (trimmed.startsWith('-')) {
+        const itemText = trimmed.replace(/^-\s*/, '');
+        if (itemText) {
+          if (currentSection === 'starters') starters.push(itemText);
+          else if (currentSection === 'topics') topics.push(itemText);
+        }
+      }
+    });
+
+    if (starters.length === 0 && topics.length === 0 && rawText !== '[No response text]') {
+      console.warn("Could not parse starters/topics, but rawText is available:", rawText);
+    }
+
+    return { ok: true, starters, topics, rawText };
+  } catch (error) {
+    clearTimeout(timeoutId);
+    return { ok: false, reason: error.message || 'Network error or unknown error during suggestions generation' };
+  }
+}
+
+/**
  * Gemini API에 전체 대화 내용을 전달하여 간결한 요약문을 생성합니다.
  * @param {string} name - 친구 이름
  * @param {Array<{type: string, text: string}>} conversationHistory - 전체 대화 기록 (질문과 답변)
@@ -236,7 +222,6 @@ export async function requestConversationSummary(name, conversationHistory) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-  // 대화 기록을 문자열로 변환
   const formattedConversation = conversationHistory.map(entry => {
     if (entry.type === 'question') {
       return `Q: ${entry.text}`;
