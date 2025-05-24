@@ -18,7 +18,7 @@ export function useCompletion(name, totalQuestions) {
      * @param {Object} navigation - 네비게이션 객체
      * @returns {Promise<void>}
      */
-    const handleComplete = useCallback(async (chatMessages, navigation) => {
+    const processCompletion = useCallback(async (chatMessages, navigation) => {
         setIsLoadingCompletion(true);
 
         const collectedAnswers = chatMessages
@@ -66,6 +66,6 @@ export function useCompletion(name, totalQuestions) {
 
     return {
         isLoadingCompletion,
-        handleComplete
+        processCompletion
     };
 } 

@@ -70,7 +70,6 @@ export default function QuestionScreen({ navigation, route }) {
   } = useChat(name, FIRST_QUESTION);
 
   const {
-    activeQuestionIndex,
     currentInputValue,
     setCurrentInputValue,
     isLoadingNextQuestion,
@@ -82,7 +81,7 @@ export default function QuestionScreen({ navigation, route }) {
 
   const {
     isLoadingCompletion,
-    handleComplete: handleCompletionProcess
+    processCompletion
   } = useCompletion(name, TOTAL_QUESTIONS);
 
   // 결과 화면용 상태들
@@ -96,7 +95,6 @@ export default function QuestionScreen({ navigation, route }) {
   // 네비게이션 헤더 높이 계산
   const headerHeight = Platform.OS === 'ios' ? 44 + Constants.statusBarHeight : Constants.statusBarHeight + 56;
 
-  // 이름이 변경될 때 상태 초기화
   React.useEffect(() => {
     if (name) {
       const initialQuestionText = resetChat();
@@ -110,25 +108,6 @@ export default function QuestionScreen({ navigation, route }) {
       setStage('questions');
     }
   }, [name, resetChat, setFirstQuestion, resetQuestionState]);
-
-  /**
-   * 사용자가 답변을 전송할 때 호출되는 함수
-   * 커스텀 훅의 handleAnswerAndGenerateNext 함수를 사용합니다.
-   */
-  const handleSendMessage = async () => {
-    const currentQuestionMessage = chatMessages.filter(msg => msg.type === 'question').slice(-1)[0];
-    const currentQuestionText = currentQuestionMessage?.text || "";
-
-    await handleAnswerAndGenerateNext(currentInputValue, currentQuestionText, addMessage);
-  };
-
-  /**
-   * 모든 질문 완료 후 결과 생성을 처리하는 함수
-   * 커스텀 훅의 handleComplete 함수를 사용합니다.
-   */
-  const handleComplete = async () => {
-    await handleCompletionProcess(chatMessages, navigation);
-  };
 
   /**
    * FlatList에서 각 채팅 메시지를 렌더링하는 함수
@@ -160,6 +139,17 @@ export default function QuestionScreen({ navigation, route }) {
     );
   };
 
+  /**
+   * 사용자가 답변을 전송할 때 호출되는 함수
+   * 커스텀 훅의 handleAnswerAndGenerateNext 함수를 사용합니다.
+   */
+  const handleSendMessage = async () => {
+    const currentQuestionMessage = chatMessages.filter(msg => msg.type === 'question').slice(-1)[0];
+    const currentQuestionText = currentQuestionMessage?.text || "";
+
+    await handleAnswerAndGenerateNext(currentInputValue, currentQuestionText, addMessage);
+  };
+
   const allQuestionsAnswered = isAllQuestionsCompleted();
   const isLoading = isLoadingNextQuestion || isLoadingCompletion; // 통합 로딩 상태
 
@@ -183,10 +173,9 @@ export default function QuestionScreen({ navigation, route }) {
           <View style={styles.inputContainer}>
             {allQuestionsAnswered ? (
               <TouchableOpacity
-                onPress={handleComplete}
+                onPress={() => processCompletion(chatMessages, navigation)}
                 disabled={isLoading}
                 style={[styles.sendButton, styles.readyButton]}
-                activeOpacity={0.7}
               >
                 <Text style={styles.sendButtonText}>Ready to talk</Text>
               </TouchableOpacity>
