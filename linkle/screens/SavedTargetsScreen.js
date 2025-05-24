@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, Platform, Alert, Modal, ActivityIndicator, SafeAreaView, Image, Dimensions } from 'react-native';
+import React from 'react';
+import { StyleSheet, Text, View, TouchableOpacity, Platform, Modal, ActivityIndicator, SafeAreaView, Image, Dimensions } from 'react-native';
 import { SwipeListView } from 'react-native-swipe-list-view';
 import Icon from 'react-native-vector-icons/Ionicons';
 import Constants from 'expo-constants';
+import { useRandomSelection, useContactNavigation, useContactActions } from '../hooks';
 
 const { width, height } = Dimensions.get('window'); // For image sizing and height
 
@@ -47,81 +48,19 @@ const { width, height } = Dimensions.get('window'); // For image sizing and heig
  * - **Empty State**: 연락처가 없을 때 안내 이미지와 메시지 표시
  * - **Highlight Effect**: 랜덤 선택된 연락처 하이라이트 표시
  * 
- * @state
- * - isLinking: 랜덤 선택 후 Linkle 진행 중인지 나타내는 boolean 상태
- * - highlightedContactId: 랜덤 선택된 연락처의 ID를 저장하는 상태
+ * @hooks
+ * - useRandomSelection: 랜덤 선택 관련 상태와 로직 관리
+ * - useContactNavigation: 네비게이션 관련 로직 관리
+ * - useContactActions: 연락처 액션(삭제 등) 관리
  * 
  * @navigation
  * - Questions: 연락처 선택 시 질문 화면으로 이동 (연락처 이름을 파라미터로 전달)
  */
 const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, navigation }) => {
-  const [isLinking, setIsLinking] = useState(false);
-  const [highlightedContactId, setHighlightedContactId] = useState(null);
-
-  /**
-   * 채팅 시작 버튼 클릭 핸들러
-   * @param {string} contactName - 선택된 연락처의 이름
-   * @description Questions 화면으로 네비게이션하여 해당 연락처와의 채팅을 시작
-   */
-  const handleChatPress = (contactName) => {
-    if (navigation) {
-      navigation.navigate('Questions', { name: contactName });
-    } else {
-      console.error("Navigation prop is not available in SavedTargetsScreen");
-      Alert.alert("Error", "Cannot navigate to Question screen.");
-    }
-  };
-
-  /**
-   * 랜덤 연락처 선택 및 Linkle 시작
-   * @description 3초간 로딩 UI를 표시한 후 저장된 연락처 중 랜덤하게 선택하여 확인 후 Questions 화면으로 이동
-   * 선택된 연락처는 하이라이트 표시되며, 로딩 상태를 표시
-   */
-  const handleRandomSelect = () => {
-    if (targetContacts && targetContacts.length > 0) {
-      // 즉시 로딩 시작
-      setIsLinking(true);
-
-      // 3초 후에 랜덤 선택 실행
-      setTimeout(() => {
-        const randomIndex = Math.floor(Math.random() * targetContacts.length);
-        const selectedContact = targetContacts[randomIndex];
-
-        // 로딩 종료
-        setIsLinking(false);
-
-        if (selectedContact) {
-          Alert.alert(
-            "Confirm Selection",
-            `'${selectedContact.name}'님과 Linkle 하시겠습니까?`,
-            [
-              {
-                text: "취소",
-                style: "cancel",
-                onPress: () => {
-                  setHighlightedContactId(null);
-                }
-              },
-              {
-                text: "Linkle 시작",
-                onPress: () => {
-                  if (selectedContact) {
-                    setHighlightedContactId(selectedContact.id);
-                  }
-                  if (navigation && selectedContact) {
-                    navigation.navigate('Questions', { name: selectedContact.name });
-                  }
-                }
-              }
-            ],
-            { cancelable: true, onDismiss: () => setHighlightedContactId(null) }
-          );
-        }
-      }, 3000); // 3초 대기
-    } else {
-      Alert.alert("No Targets", "No targets are saved, so a random selection cannot be made.");
-    }
-  };
+  // 커스텀 훅들 사용
+  const { isLinking, highlightedContactId, handleRandomSelect } = useRandomSelection(targetContacts, navigation);
+  const { handleChatPress } = useContactNavigation(navigation);
+  const { confirmDelete } = useContactActions(onRemoveTarget);
 
   /**
    * SwipeListView의 각 연락처 아이템 렌더링
@@ -165,24 +104,7 @@ const SavedTargetsScreen = ({ targetContacts, onManageTargets, onRemoveTarget, n
     </View>
   );
 
-  /**
-   * 연락처 삭제 확인 다이얼로그 표시
-   * @param {Object} item - 삭제할 연락처 객체
-   * @param {string} item.name - 연락처 이름
-   * @param {string} item.id - 연락처 ID
-   * @description 삭제 확인 알림을 표시하고 사용자 확인 시 onRemoveTarget 콜백 호출
-   */
-  const confirmDelete = (item) => {
-    Alert.alert(
-      "Confirm Delete",
-      `Are you sure you want to delete '${item.name}'?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        { text: "OK", onPress: () => onRemoveTarget(item.id) }
-      ],
-      { cancelable: false }
-    );
-  };
+
 
   /**
    * 빈 리스트 상태 컴포넌트 렌더링
